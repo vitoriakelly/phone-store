@@ -1,0 +1,275 @@
+.create-device {
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+
+  &__heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 24px;
+
+    margin-bottom: 28px;
+  }
+
+  &__back {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+
+    margin-bottom: 18px;
+
+    color: #2563eb;
+    font-size: 14px;
+    font-weight: 600;
+
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+
+  &__heading-icon {
+    display: flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+
+    width: 58px;
+    height: 58px;
+    border-radius: 16px;
+
+    color: #2563eb;
+    background-color: #dbeafe;
+  }
+
+  &__form {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+  }
+
+  &__section {
+    padding: 26px;
+    border: 1px solid #e5e7eb;
+    border-radius: 14px;
+
+    background-color: #ffffff;
+    box-shadow: 0 4px 14px rgb(15 23 42 / 4%);
+  }
+
+  &__section-heading {
+    margin-bottom: 24px;
+    padding-bottom: 18px;
+    border-bottom: 1px solid #e5e7eb;
+
+    h2 {
+      color: #111827;
+      font-size: 19px;
+    }
+
+    p {
+      margin-top: 5px;
+      font-size: 13px;
+    }
+  }
+
+  &__grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 22px;
+  }
+
+  &__field {
+    display: flex;
+    flex-direction: column;
+
+    label {
+      margin-bottom: 8px;
+
+      color: #374151;
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    input,
+    select,
+    textarea {
+      width: 100%;
+      border: 1px solid #d1d5db;
+      border-radius: 9px;
+      outline: none;
+
+      color: #111827;
+      background-color: #ffffff;
+
+      font-size: 14px;
+
+      transition:
+        border-color 0.2s,
+        box-shadow 0.2s;
+
+      &:focus {
+        border-color: #2563eb;
+        box-shadow: 0 0 0 3px rgb(37 99 235 / 12%);
+      }
+
+      &::placeholder {
+        color: #9ca3af;
+      }
+    }
+
+    input,
+    select {
+      height: 46px;
+      padding: 0 13px;
+    }
+
+    textarea {
+      min-height: 120px;
+      padding: 13px;
+      resize: vertical;
+    }
+  }
+
+  &__input-prefix,
+  &__input-suffix {
+    position: relative;
+
+    display: flex;
+    align-items: center;
+
+    span {
+      position: absolute;
+
+      color: #6b7280;
+      font-size: 14px;
+      pointer-events: none;
+    }
+
+    input {
+      width: 100%;
+    }
+  }
+
+  &__input-prefix {
+    span {
+      left: 13px;
+    }
+
+    input {
+      padding-left: 42px;
+    }
+  }
+
+  &__input-suffix {
+    span {
+      right: 13px;
+    }
+
+    input {
+      padding-right: 38px;
+    }
+  }
+
+  &__error {
+    margin-top: 6px;
+
+    color: #dc2626;
+    font-size: 12px;
+    line-height: 1.4;
+  }
+
+  &__actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 14px;
+
+    padding: 22px 26px;
+    border: 1px solid #e5e7eb;
+    border-radius: 14px;
+
+    background-color: #ffffff;
+  }
+
+  &__cancel,
+  &__submit {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+
+    min-height: 44px;
+    padding: 0 20px;
+    border-radius: 9px;
+
+    font-size: 14px;
+    font-weight: 600;
+  }
+
+  &__cancel {
+    border: 1px solid #d1d5db;
+
+    color: #374151;
+    background-color: #ffffff;
+
+    &:hover {
+      background-color: #f9fafb;
+    }
+  }
+
+  &__submit {
+    gap: 8px;
+
+    border: 0;
+
+    color: #ffffff;
+    background-color: #2563eb;
+
+    &:hover {
+      background-color: #1d4ed8;
+    }
+
+    &:disabled {
+      cursor: not-allowed;
+      opacity: 0.65;
+    }
+  }
+}
+
+@media (max-width: 768px) {
+  .create-device {
+    &__heading {
+      align-items: flex-start;
+    }
+
+    &__heading-icon {
+      display: none;
+    }
+
+    &__section {
+      padding: 20px 16px;
+    }
+
+    &__grid {
+      grid-template-columns: 1fr;
+      gap: 18px;
+    }
+
+    &__actions {
+      padding: 16px;
+    }
+  }
+}
+
+@media (max-width: 520px) {
+  .create-device {
+    &__actions {
+      flex-direction: column-reverse;
+    }
+
+    &__cancel,
+    &__submit {
+      width: 100%;
+    }
+  }
+}

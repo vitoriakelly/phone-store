@@ -1,0 +1,39 @@
+.layout {
+  min-height: 100vh;
+
+  &__content {
+    min-height: 100vh;
+    margin-left: 260px;
+  }
+
+  &__page {
+    padding: 32px;
+  }
+
+  &__overlay {
+    display: none;
+  }
+}
+
+@media (max-width: 768px) {
+  .layout {
+    &__content {
+      margin-left: 0;
+    }
+
+    &__page {
+      padding: 24px 16px;
+    }
+
+    &__overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 25;
+
+      display: block;
+
+      border: 0;
+      background-color: rgb(17 24 39 / 60%);
+    }
+  }
+}
