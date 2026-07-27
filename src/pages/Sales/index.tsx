@@ -1,12 +1,13 @@
 import {
   BadgeDollarSign,
   CalendarDays,
+  Eye,
   Search,
   Smartphone,
   UserRound,
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
-
+import { Link } from 'react-router-dom';
 import { getSales } from '../../services/saleStorage';
 import type {
   PaymentMethod,
@@ -204,6 +205,7 @@ export function Sales() {
                     <th>Pagamento</th>
                     <th>Valor</th>
                     <th>Lucro</th>
+                    <th>Ações</th>
                   </tr>
                 </thead>
 
@@ -272,6 +274,16 @@ export function Sales() {
                             {formatCurrency(profit)}
                           </strong>
                         </td>
+                        <td>
+                          <Link
+                            to={`/vendas/${sale.id}`}
+                            className="sales__details"
+                            title="Visualizar venda"
+                            aria-label={`Visualizar venda de ${sale.customerName}`}
+                          >
+                            <Eye size={18} />
+                          </Link>
+                        </td>
                       </tr>
                     );
                   })}
@@ -337,7 +349,13 @@ export function Sales() {
                           {formatDate(sale.soldAt)}
                         </strong>
                       </div>
-
+                      <Link
+                        to={`/vendas/${sale.id}`}
+                        className="sales__card-details"
+                      >
+                        <Eye size={18} />
+                        Ver detalhes da venda
+                      </Link>
                       <div>
                         <span>Valor vendido</span>
                         <strong>

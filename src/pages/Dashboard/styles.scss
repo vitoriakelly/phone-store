@@ -25,10 +25,15 @@
     font-size: 14px;
     font-weight: 600;
 
-    transition: background-color 0.2s;
+    transition:
+      background-color 0.2s ease,
+      transform 0.2s ease,
+      box-shadow 0.2s ease;
 
     &:hover {
       background-color: #1d4ed8;
+      box-shadow: 0 6px 14px rgb(37 99 235 / 22%);
+      transform: translateY(-1px);
     }
   }
 
@@ -38,6 +43,61 @@
     gap: 20px;
   }
 
+  &__financial {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 20px;
+
+    margin-top: 20px;
+  }
+
+  &__financial-card {
+    padding: 22px;
+    border: 1px solid #e5e7eb;
+    border-radius: 14px;
+
+    background-color: #ffffff;
+    box-shadow: 0 4px 14px rgb(15 23 42 / 4%);
+
+    transition:
+      transform 0.2s ease,
+      box-shadow 0.2s ease;
+
+    &:hover {
+      box-shadow: 0 8px 22px rgb(15 23 42 / 8%);
+      transform: translateY(-2px);
+    }
+
+    span {
+      color: #6b7280;
+      font-size: 13px;
+      font-weight: 500;
+    }
+
+    strong {
+      display: block;
+
+      margin-top: 7px;
+
+      color: #111827;
+      font-size: 24px;
+    }
+
+    small {
+      display: block;
+
+      margin-top: 7px;
+
+      color: #9ca3af;
+      font-size: 12px;
+      line-height: 1.4;
+    }
+
+    &:nth-child(2) strong {
+      color: #15803d;
+    }
+  }
+
   &__recent {
     margin-top: 30px;
     padding: 24px;
@@ -45,6 +105,7 @@
     border-radius: 14px;
 
     background-color: #ffffff;
+    box-shadow: 0 4px 14px rgb(15 23 42 / 4%);
   }
 
   &__section-header {
@@ -69,6 +130,7 @@
       color: #2563eb;
       font-size: 14px;
       font-weight: 600;
+      white-space: nowrap;
 
       &:hover {
         text-decoration: underline;
@@ -190,12 +252,247 @@
   &__mobile-list {
     display: none;
   }
+
+  &__empty {
+    display: flex;
+    align-items: center;
+    flex-direction: column;
+    justify-content: center;
+
+    min-height: 250px;
+    padding: 45px 20px;
+
+    text-align: center;
+
+    svg {
+      color: #2563eb;
+    }
+
+    h3 {
+      margin-top: 15px;
+
+      color: #111827;
+      font-size: 18px;
+    }
+
+    p {
+      max-width: 400px;
+      margin-top: 7px;
+
+      color: #6b7280;
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    a {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+
+      min-height: 42px;
+      margin-top: 18px;
+      padding: 0 17px;
+      border-radius: 9px;
+
+      color: #ffffff;
+      background-color: #2563eb;
+
+      font-size: 13px;
+      font-weight: 600;
+
+      &:hover {
+        background-color: #1d4ed8;
+      }
+    }
+  }
+
+  &__sales-list {
+    display: grid;
+    gap: 12px;
+  }
+
+  &__sale-card {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 24px;
+
+    padding: 17px;
+    border: 1px solid #e5e7eb;
+    border-radius: 11px;
+
+    background-color: #f9fafb;
+
+    transition:
+      border-color 0.2s ease,
+      background-color 0.2s ease;
+
+    &:hover {
+      border-color: #d1d5db;
+      background-color: #f3f4f6;
+    }
+  }
+
+  &__sale-main {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+
+    min-width: 0;
+
+    > div:last-child {
+      min-width: 0;
+    }
+
+    strong,
+    span {
+      display: block;
+    }
+
+    strong {
+      overflow: hidden;
+
+      color: #111827;
+      font-size: 14px;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    span {
+      overflow: hidden;
+
+      margin-top: 4px;
+
+      color: #6b7280;
+      font-size: 12px;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+  }
+
+  &__sale-icon {
+    display: flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+
+    width: 42px;
+    height: 42px;
+    border-radius: 11px;
+
+    color: #15803d;
+    background-color: #dcfce7;
+  }
+
+  &__sale-data {
+    display: grid;
+    grid-template-columns: repeat(4, auto);
+    gap: 26px;
+
+    div {
+      display: flex;
+      flex-direction: column;
+    }
+
+    span {
+      color: #6b7280;
+      font-size: 11px;
+    }
+
+    strong {
+      margin-top: 4px;
+
+      color: #111827;
+      font-size: 13px;
+      white-space: nowrap;
+    }
+  }
+
+  &__sale-profit {
+    color: #15803d !important;
+  }
+
+  &__mobile-card {
+    padding: 16px;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+
+    background-color: #ffffff;
+  }
+
+  &__mobile-top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  &__mobile-info {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid #e5e7eb;
+
+    div {
+      display: flex;
+      flex-direction: column;
+    }
+
+    span {
+      color: #6b7280;
+      font-size: 12px;
+    }
+
+    strong {
+      margin-top: 4px;
+
+      color: #111827;
+      font-size: 13px;
+    }
+  }
+
+  &__mobile-details {
+    display: flex;
+    justify-content: center;
+
+    margin-top: 16px;
+    padding: 10px;
+    border-radius: 8px;
+
+    color: #2563eb;
+    background-color: #eff6ff;
+
+    font-size: 13px;
+    font-weight: 600;
+  }
 }
 
 @media (max-width: 1200px) {
   .dashboard {
     &__summary {
       grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+}
+
+@media (max-width: 1000px) {
+  .dashboard {
+    &__financial {
+      grid-template-columns: 1fr;
+    }
+
+    &__sale-card {
+      align-items: flex-start;
+      flex-direction: column;
+    }
+
+    &__sale-data {
+      width: 100%;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 16px;
     }
   }
 }
@@ -211,7 +508,11 @@
     }
 
     &__recent {
-      padding: 18px;
+      padding: 18px 16px;
+    }
+
+    &__section-header {
+      align-items: flex-start;
     }
 
     &__table-container {
@@ -221,63 +522,6 @@
     &__mobile-list {
       display: grid;
       gap: 14px;
-    }
-
-    &__mobile-card {
-      padding: 16px;
-      border: 1px solid #e5e7eb;
-      border-radius: 12px;
-
-      background-color: #ffffff;
-    }
-
-    &__mobile-top {
-      display: flex;
-      align-items: flex-start;
-      justify-content: space-between;
-      gap: 12px;
-    }
-
-    &__mobile-info {
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: 12px;
-
-      margin-top: 16px;
-      padding-top: 16px;
-      border-top: 1px solid #e5e7eb;
-
-      div {
-        display: flex;
-        flex-direction: column;
-      }
-
-      span {
-        color: #6b7280;
-        font-size: 12px;
-      }
-
-      strong {
-        margin-top: 4px;
-
-        color: #111827;
-        font-size: 13px;
-      }
-    }
-
-    &__mobile-details {
-      display: flex;
-      justify-content: center;
-
-      margin-top: 16px;
-      padding: 10px;
-      border-radius: 8px;
-
-      color: #2563eb;
-      background-color: #eff6ff;
-
-      font-size: 13px;
-      font-weight: 600;
     }
   }
 }
@@ -289,11 +533,19 @@
     }
 
     &__section-header {
-      align-items: flex-start;
+      flex-direction: column;
+
+      > a {
+        align-self: flex-start;
+      }
     }
 
     &__mobile-top {
       flex-direction: column;
+    }
+
+    &__sale-data {
+      grid-template-columns: 1fr;
     }
   }
 }

@@ -395,4 +395,43 @@
       grid-template-columns: 1fr;
     }
   }
+  .sales {
+  &__details {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+
+    color: #2563eb;
+    background-color: #eff6ff;
+
+    &:hover {
+      background-color: #dbeafe;
+    }
+  }
+
+  &__card-details {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+
+    min-height: 42px;
+    margin-top: 18px;
+    border-radius: 8px;
+
+    color: #2563eb;
+    background-color: #eff6ff;
+
+    font-size: 13px;
+    font-weight: 600;
+
+    &:hover {
+      background-color: #dbeafe;
+    }
+  }
+}
 }

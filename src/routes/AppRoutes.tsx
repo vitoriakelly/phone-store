@@ -12,6 +12,7 @@ import { Devices } from '../pages/Devices';
 import { EditDevice } from '../pages/EditDevice';
 import { RegisterSale } from '../pages/RegisterSale';
 import { Sales } from '../pages/Sales';
+import { SaleDetails } from '../pages/SaleDetails';
 
 export function AppRoutes() {
   return (
@@ -38,26 +39,29 @@ export function AppRoutes() {
         />
 
         <Route
+          path="/dispositivos/:id/vender"
+          element={<RegisterSale />}
+        />
+
+        <Route
           path="/dispositivos/:id"
           element={<DeviceDetails />}
+        />
+
+        <Route
+          path="/vendas"
+          element={<Sales />}
+        />
+        <Route
+          path="/vendas/:id"
+          element={<SaleDetails />}
         />
       </Route>
 
       <Route
         path="*"
-        element={
-          <Navigate to="/" replace />
-        }
-      />
-      <Route
-        path="/dispositivos/:id/vender"
-        element={<RegisterSale />}
-      />
-      <Route
-        path="/vendas"
-        element={<Sales />}
+        element={<Navigate to="/" replace />}
       />
     </Routes>
-
   );
 }
