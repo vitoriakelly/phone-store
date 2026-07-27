@@ -1,5 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { ArrowLeft, Save, Smartphone } from 'lucide-react';
+import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { Link, useNavigate } from 'react-router-dom';
 
@@ -7,11 +8,8 @@ import {
   deviceSchema,
   type DeviceFormData,
 } from '../../schemas/deviceSchema';
-import {
-  deviceExistsByImei,
-  saveDevice,
-} from '../../services/deviceStorage';
-import type { Device } from '../../types/device';
+import { ApiError } from '../../services/api';
+import { createDevice } from '../../services/deviceApi';
 
 import './styles.scss';
 
@@ -27,6 +25,8 @@ function getCurrentDate() {
 export function CreateDevice() {
   const navigate = useNavigate();
 
+  const [submitError, setSubmitError] = useState('');
+
   const {
     register,
     handleSubmit,
@@ -34,6 +34,7 @@ export function CreateDevice() {
     formState: { errors, isSubmitting },
   } = useForm<DeviceFormData>({
     resolver: zodResolver(deviceSchema),
+
     defaultValues: {
       brand: '',
       model: '',
@@ -51,41 +52,68 @@ export function CreateDevice() {
     },
   });
 
-  function handleCreateDevice(data: DeviceFormData) {
-    if (deviceExistsByImei(data.imei)) {
-      setError('imei', {
-        type: 'manual',
-        message: 'Já existe um dispositivo cadastrado com este IMEI.',
+  async function handleCreateDevice(
+    data: DeviceFormData,
+  ) {
+    setSubmitError('');
+
+    try {
+      await createDevice({
+        brand: data.brand,
+        model: data.model,
+        storage: data.storage,
+        color: data.color,
+        imei: data.imei,
+        batteryHealth: data.batteryHealth,
+        condition: data.condition,
+        purchasePrice: data.purchasePrice,
+        salePrice: data.salePrice,
+        supplier: data.supplier || undefined,
+        entryDate: data.entryDate,
+        status: data.status,
+        notes: data.notes || undefined,
       });
 
-      return;
+      navigate('/dispositivos', {
+        state: {
+          successMessage:
+            'Dispositivo cadastrado com sucesso.',
+        },
+      });
+    } catch (error) {
+      if (error instanceof ApiError) {
+        const imeiError =
+          error.errors?.imei?.[0];
+
+        if (
+          imeiError ||
+          (error.status === 409 &&
+            error.message
+              .toLowerCase()
+              .includes('imei'))
+        ) {
+          setError('imei', {
+            type: 'server',
+            message:
+              imeiError ?? error.message,
+          });
+
+          return;
+        }
+
+        setSubmitError(error.message);
+        return;
+      }
+
+      console.error(
+        'Erro ao cadastrar dispositivo:',
+        error,
+      );
+
+      setSubmitError(
+        'Não foi possível conectar com a API. Verifique se o servidor está funcionando.',
+      );
     }
-
-    const device: Device = {
-      id: crypto.randomUUID(),
-      brand: data.brand,
-      model: data.model,
-      storage: data.storage,
-      color: data.color,
-      imei: data.imei,
-      batteryHealth: data.batteryHealth,
-      condition: data.condition,
-      purchasePrice: data.purchasePrice,
-      salePrice: data.salePrice,
-      supplier: data.supplier || undefined,
-      entryDate: data.entryDate,
-      status: data.status,
-      notes: data.notes || undefined,
-      createdAt: new Date().toISOString(),
-    };
-
-    saveDevice(device);
-
-    navigate('/dispositivos', {
-      state: {
-        successMessage: 'Dispositivo cadastrado com sucesso.',
-      },
-    });
   }
 
   return (
@@ -103,8 +131,8 @@ export function CreateDevice() {
           <h1>Cadastrar dispositivo</h1>
 
           <p>
-            Preencha as informações do aparelho que está entrando
-            na loja.
+            Preencha as informações do aparelho que está
+            entrando na loja.
           </p>
         </div>
 
@@ -115,18 +143,25 @@ export function CreateDevice() {
 
       <form
         className="create-device__form"
-        onSubmit={handleSubmit(handleCreateDevice)}
+        onSubmit={handleSubmit(
+          handleCreateDevice,
+        )}
         noValidate
       >
         <section className="create-device__section">
           <div className="create-device__section-heading">
             <h2>Informações do aparelho</h2>
-            <p>Dados de identificação do dispositivo.</p>
+
+            <p>
+              Dados de identificação do dispositivo.
+            </p>
           </div>
 
           <div className="create-device__grid">
             <div className="create-device__field">
-              <label htmlFor="brand">Marca *</label>
+              <label htmlFor="brand">
+                Marca *
+              </label>
 
               <input
                 id="brand"
@@ -143,7 +178,9 @@ export function CreateDevice() {
             </div>
 
             <div className="create-device__field">
-              <label htmlFor="model">Modelo *</label>
+              <label htmlFor="model">
+                Modelo *
+              </label>
 
               <input
                 id="model"
@@ -160,16 +197,41 @@ export function CreateDevice() {
             </div>
 
             <div className="create-device__field">
-              <label htmlFor="storage">Armazenamento *</label>
+              <label htmlFor="storage">
+                Armazenamento *
+              </label>
 
-              <select id="storage" {...register('storage')}>
-                <option value="">Selecione</option>
-                <option value="32 GB">32 GB</option>
-                <option value="64 GB">64 GB</option>
-                <option value="128 GB">128 GB</option>
-                <option value="256 GB">256 GB</option>
-                <option value="512 GB">512 GB</option>
-                <option value="1 TB">1 TB</option>
+              <select
+                id="storage"
+                {...register('storage')}
+              >
+                <option value="">
+                  Selecione
+                </option>
+
+                <option value="32 GB">
+                  32 GB
+                </option>
+
+                <option value="64 GB">
+                  64 GB
+                </option>
+
+                <option value="128 GB">
+                  128 GB
+                </option>
+
+                <option value="256 GB">
+                  256 GB
+                </option>
+
+                <option value="512 GB">
+                  512 GB
+                </option>
+
+                <option value="1 TB">
+                  1 TB
+                </option>
               </select>
 
               {errors.storage && (
@@ -180,7 +242,9 @@ export function CreateDevice() {
             </div>
 
             <div className="create-device__field">
-              <label htmlFor="color">Cor *</label>
+              <label htmlFor="color">
+                Cor *
+              </label>
 
               <input
                 id="color"
@@ -197,7 +261,9 @@ export function CreateDevice() {
             </div>
 
             <div className="create-device__field">
-              <label htmlFor="imei">IMEI *</label>
+              <label htmlFor="imei">
+                IMEI *
+              </label>
 
               <input
                 id="imei"
@@ -207,10 +273,11 @@ export function CreateDevice() {
                 placeholder="Digite os 15 números"
                 {...register('imei', {
                   onChange: (event) => {
-                    event.target.value = event.target.value.replace(
-                      /\D/g,
-                      '',
-                    );
+                    event.target.value =
+                      event.target.value.replace(
+                        /\D/g,
+                        '',
+                      );
                   },
                 })}
               />
@@ -234,10 +301,15 @@ export function CreateDevice() {
                   min="0"
                   max="100"
                   placeholder="Ex.: 89"
-                  {...register('batteryHealth', {
-                    setValueAs: (value) =>
-                      value === '' ? undefined : Number(value),
-                  })}
+                  {...register(
+                    'batteryHealth',
+                    {
+                      setValueAs: (value) =>
+                        value === ''
+                          ? undefined
+                          : Number(value),
+                    },
+                  )}
                 />
 
                 <span>%</span>
@@ -245,21 +317,34 @@ export function CreateDevice() {
 
               {errors.batteryHealth && (
                 <span className="create-device__error">
-                  {errors.batteryHealth.message}
+                  {
+                    errors.batteryHealth
+                      .message
+                  }
                 </span>
               )}
             </div>
 
             <div className="create-device__field">
-              <label htmlFor="condition">Condição *</label>
+              <label htmlFor="condition">
+                Condição *
+              </label>
 
               <select
                 id="condition"
                 {...register('condition')}
               >
-                <option value="NOVO">Novo</option>
-                <option value="SEMINOVO">Seminovo</option>
-                <option value="USADO">Usado</option>
+                <option value="NOVO">
+                  Novo
+                </option>
+
+                <option value="SEMINOVO">
+                  Seminovo
+                </option>
+
+                <option value="USADO">
+                  Usado
+                </option>
               </select>
 
               {errors.condition && (
@@ -270,12 +355,25 @@ export function CreateDevice() {
             </div>
 
             <div className="create-device__field">
-              <label htmlFor="status">Status inicial *</label>
+              <label htmlFor="status">
+                Status inicial *
+              </label>
 
-              <select id="status" {...register('status')}>
-                <option value="DISPONIVEL">Disponível</option>
-                <option value="RESERVADO">Reservado</option>
-                <option value="VENDIDO">Vendido</option>
+              <select
+                id="status"
+                {...register('status')}
+              >
+                <option value="DISPONIVEL">
+                  Disponível
+                </option>
+
+                <option value="RESERVADO">
+                  Reservado
+                </option>
+
+                <option value="VENDIDO">
+                  Vendido
+                </option>
               </select>
 
               {errors.status && (
@@ -290,8 +388,10 @@ export function CreateDevice() {
         <section className="create-device__section">
           <div className="create-device__section-heading">
             <h2>Entrada e valores</h2>
+
             <p>
-              Informações comerciais e de entrada no estoque.
+              Informações comerciais e de entrada no
+              estoque.
             </p>
           </div>
 
@@ -310,21 +410,29 @@ export function CreateDevice() {
                   min="0"
                   step="0.01"
                   placeholder="0,00"
-                  {...register('purchasePrice', {
-                    valueAsNumber: true,
-                  })}
+                  {...register(
+                    'purchasePrice',
+                    {
+                      valueAsNumber: true,
+                    },
+                  )}
                 />
               </div>
 
               {errors.purchasePrice && (
                 <span className="create-device__error">
-                  {errors.purchasePrice.message}
+                  {
+                    errors.purchasePrice
+                      .message
+                  }
                 </span>
               )}
             </div>
 
             <div className="create-device__field">
-              <label htmlFor="salePrice">Valor de venda *</label>
+              <label htmlFor="salePrice">
+                Valor de venda *
+              </label>
 
               <div className="create-device__input-prefix">
                 <span>R$</span>
@@ -349,7 +457,9 @@ export function CreateDevice() {
             </div>
 
             <div className="create-device__field">
-              <label htmlFor="entryDate">Data de entrada *</label>
+              <label htmlFor="entryDate">
+                Data de entrada *
+              </label>
 
               <input
                 id="entryDate"
@@ -365,7 +475,9 @@ export function CreateDevice() {
             </div>
 
             <div className="create-device__field">
-              <label htmlFor="supplier">Fornecedor</label>
+              <label htmlFor="supplier">
+                Fornecedor
+              </label>
 
               <input
                 id="supplier"
@@ -386,13 +498,17 @@ export function CreateDevice() {
         <section className="create-device__section">
           <div className="create-device__section-heading">
             <h2>Observações</h2>
+
             <p>
-              Registre detalhes adicionais sobre o dispositivo.
+              Registre detalhes adicionais sobre o
+              dispositivo.
             </p>
           </div>
 
           <div className="create-device__field">
-            <label htmlFor="notes">Observações</label>
+            <label htmlFor="notes">
+              Observações
+            </label>
 
             <textarea
               id="notes"
@@ -408,6 +524,15 @@ export function CreateDevice() {
             )}
           </div>
         </section>
+
+        {submitError && (
+          <div
+            className="create-device__submit-error"
+            role="alert"
+          >
+            {submitError}
+          </div>
+        )}
 
         <footer className="create-device__actions">
           <Link

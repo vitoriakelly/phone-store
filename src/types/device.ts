@@ -1,6 +1,12 @@
-export type DeviceStatus = 'DISPONIVEL' | 'RESERVADO' | 'VENDIDO';
+export type DeviceStatus =
+  | 'DISPONIVEL'
+  | 'RESERVADO'
+  | 'VENDIDO';
 
-export type DeviceCondition = 'NOVO' | 'SEMINOVO' | 'USADO';
+export type DeviceCondition =
+  | 'NOVO'
+  | 'SEMINOVO'
+  | 'USADO';
 
 export interface Device {
   id: string;
@@ -9,13 +15,14 @@ export interface Device {
   storage: string;
   color: string;
   imei: string;
-  batteryHealth?: number;
+  batteryHealth?: number | null;
   condition: DeviceCondition;
   purchasePrice: number;
   salePrice: number;
-  supplier?: string;
+  supplier?: string | null;
   entryDate: string;
   status: DeviceStatus;
-  notes?: string;
+  notes?: string | null;
   createdAt: string;
+  updatedAt?: string;
 }
