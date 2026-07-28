@@ -15,9 +15,10 @@ export interface Sale {
   purchasePrice: number;
   salePrice: number;
   customerName: string;
-  customerPhone?: string;
+  customerPhone?: string | null;
   paymentMethod: PaymentMethod;
   soldAt: string;
-  notes?: string;
+  notes?: string | null;
   createdAt: string;
+  updatedAt?: string;
 }

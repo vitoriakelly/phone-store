@@ -24,11 +24,12 @@ import {
   useParams,
 } from 'react-router-dom';
 
+import { ApiError } from '../../services/api';
 import {
   deleteDevice,
   getDeviceById,
-  updateDeviceStatus,
-} from '../../services/deviceStorage';
+  updateDevice,
+} from '../../services/deviceApi';
 import type {
   Device,
   DeviceStatus,
@@ -81,47 +82,137 @@ export function DeviceDetails() {
   const [successMessage, setSuccessMessage] =
     useState('');
 
+  const [loadError, setLoadError] =
+    useState('');
+
+  const [isLoading, setIsLoading] =
+    useState(true);
+
+  const [
+    isUpdatingStatus,
+    setIsUpdatingStatus,
+  ] = useState(false);
+
+  const [isDeleting, setIsDeleting] =
+    useState(false);
+
   useEffect(() => {
-    if (!id) {
-      return;
+    let isMounted = true;
+
+    async function loadDevice() {
+      if (!id) {
+        if (isMounted) {
+          setLoadError(
+            'O identificador do dispositivo não foi informado.',
+          );
+          setIsLoading(false);
+        }
+
+        return;
+      }
+
+      setIsLoading(true);
+      setLoadError('');
+
+      try {
+        const apiDevice =
+          await getDeviceById(id);
+
+        if (!isMounted) {
+          return;
+        }
+
+        setDevice(apiDevice);
+        setSelectedStatus(apiDevice.status);
+      } catch (error) {
+        if (!isMounted) {
+          return;
+        }
+
+        setDevice(null);
+
+        if (
+          error instanceof ApiError &&
+          error.status === 404
+        ) {
+          setLoadError(
+            'O aparelho solicitado não existe ou foi excluído.',
+          );
+        } else if (error instanceof ApiError) {
+          setLoadError(error.message);
+        } else {
+          setLoadError(
+            'Não foi possível carregar o dispositivo. Verifique se a API está funcionando.',
+          );
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
+      }
     }
 
-    const storedDevice = getDeviceById(id);
+    void loadDevice();
 
-    if (!storedDevice) {
-      return;
-    }
-
-    setDevice(storedDevice);
-    setSelectedStatus(storedDevice.status);
+    return () => {
+      isMounted = false;
+    };
   }, [id]);
 
-  function handleUpdateStatus() {
-    if (!id || !device) {
+  useEffect(() => {
+    if (!successMessage) {
       return;
     }
 
-    const updatedDevice = updateDeviceStatus(
-      id,
-      selectedStatus,
-    );
-
-    if (!updatedDevice) {
-      return;
-    }
-
-    setDevice(updatedDevice);
-    setSuccessMessage(
-      'Status atualizado com sucesso.',
-    );
-
-    window.setTimeout(() => {
+    const timeout = window.setTimeout(() => {
       setSuccessMessage('');
     }, 3500);
+
+    return () => {
+      window.clearTimeout(timeout);
+    };
+  }, [successMessage]);
+
+  async function handleUpdateStatus() {
+    if (
+      !id ||
+      !device ||
+      selectedStatus === device.status
+    ) {
+      return;
+    }
+
+    setIsUpdatingStatus(true);
+
+    try {
+      const updatedDevice =
+        await updateDevice(id, {
+          status: selectedStatus,
+        });
+
+      setDevice(updatedDevice);
+      setSelectedStatus(
+        updatedDevice.status,
+      );
+
+      setSuccessMessage(
+        'Status atualizado com sucesso.',
+      );
+    } catch (error) {
+      if (error instanceof ApiError) {
+        window.alert(error.message);
+      } else {
+        window.alert(
+          'Não foi possível atualizar o status do dispositivo.',
+        );
+      }
+    } finally {
+      setIsUpdatingStatus(false);
+    }
   }
 
-  function handleDeleteDevice() {
-    if (!device) {
+  async function handleDeleteDevice() {
+    if (!device || isDeleting) {
       return;
     }
 
@@ -133,14 +224,47 @@ export function DeviceDetails() {
       return;
     }
 
-    deleteDevice(device.id);
+    setIsDeleting(true);
 
-    navigate('/dispositivos', {
-      state: {
-        successMessage:
-          'Dispositivo excluído com sucesso.',
-      },
-    });
+    try {
+      await deleteDevice(device.id);
+
+      navigate('/dispositivos', {
+        state: {
+          successMessage:
+            'Dispositivo excluído com sucesso.',
+        },
+      });
+    } catch (error) {
+      if (error instanceof ApiError) {
+        window.alert(error.message);
+      } else {
+        window.alert(
+          'Não foi possível excluir o dispositivo.',
+        );
+      }
+    } finally {
+      setIsDeleting(false);
+    }
+  }
+
+  if (isLoading) {
+    return (
+      <main className="device-details">
+        <section className="device-details__not-found">
+          <div className="device-details__not-found-icon">
+            <Smartphone size={34} />
+          </div>
+
+          <h1>Carregando dispositivo...</h1>
+
+          <p>
+            Aguarde enquanto buscamos as informações do
+            aparelho.
+          </p>
+        </section>
+      </main>
+    );
   }
 
   if (!device) {
@@ -154,8 +278,8 @@ export function DeviceDetails() {
           <h1>Dispositivo não encontrado</h1>
 
           <p>
-            O aparelho solicitado não existe ou foi
-            excluído.
+            {loadError ||
+              'O aparelho solicitado não existe ou foi excluído.'}
           </p>
 
           <Link to="/dispositivos">
@@ -298,6 +422,7 @@ export function DeviceDetails() {
 
                 <div>
                   <span>Condição</span>
+
                   <strong>
                     {getConditionLabel(
                       device.condition,
@@ -311,8 +436,9 @@ export function DeviceDetails() {
 
                 <div>
                   <span>Saúde da bateria</span>
+
                   <strong>
-                    {device.batteryHealth !== undefined
+                    {device.batteryHealth != null
                       ? `${device.batteryHealth}%`
                       : 'Não informada'}
                   </strong>
@@ -324,6 +450,7 @@ export function DeviceDetails() {
 
                 <div>
                   <span>Data de entrada</span>
+
                   <strong>
                     {formatDate(device.entryDate)}
                   </strong>
@@ -356,7 +483,9 @@ export function DeviceDetails() {
                 <span>Valor de venda</span>
 
                 <strong>
-                  {formatCurrency(device.salePrice)}
+                  {formatCurrency(
+                    device.salePrice,
+                  )}
                 </strong>
               </article>
 
@@ -417,9 +546,11 @@ export function DeviceDetails() {
               value={selectedStatus}
               onChange={(event) =>
                 setSelectedStatus(
-                  event.target.value as DeviceStatus,
+                  event.target
+                    .value as DeviceStatus,
                 )
               }
+              disabled={isUpdatingStatus}
             >
               <option value="DISPONIVEL">
                 Disponível
@@ -436,13 +567,19 @@ export function DeviceDetails() {
 
             <button
               type="button"
-              onClick={handleUpdateStatus}
+              onClick={() =>
+                void handleUpdateStatus()
+              }
               disabled={
+                isUpdatingStatus ||
                 selectedStatus === device.status
               }
             >
               <Save size={18} />
-              Salvar status
+
+              {isUpdatingStatus
+                ? 'Salvando...'
+                : 'Salvar status'}
             </button>
           </section>
 
@@ -456,10 +593,16 @@ export function DeviceDetails() {
 
             <button
               type="button"
-              onClick={handleDeleteDevice}
+              onClick={() =>
+                void handleDeleteDevice()
+              }
+              disabled={isDeleting}
             >
               <Trash2 size={18} />
-              Excluir dispositivo
+
+              {isDeleting
+                ? 'Excluindo...'
+                : 'Excluir dispositivo'}
             </button>
           </section>
         </aside>

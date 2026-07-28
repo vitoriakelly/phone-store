@@ -19,11 +19,11 @@ import {
   deviceSchema,
   type DeviceFormData,
 } from '../../schemas/deviceSchema';
+import { ApiError } from '../../services/api';
 import {
-  deviceExistsByImei,
   getDeviceById,
   updateDevice,
-} from '../../services/deviceStorage';
+} from '../../services/deviceApi';
 import type { Device } from '../../types/device';
 
 import '../CreateDevice/styles.scss';
@@ -41,6 +41,12 @@ export function EditDevice() {
   const [notFound, setNotFound] =
     useState(false);
 
+  const [loadError, setLoadError] =
+    useState('');
+
+  const [submitError, setSubmitError] =
+    useState('');
+
   const {
     register,
     handleSubmit,
@@ -55,87 +61,186 @@ export function EditDevice() {
   });
 
   useEffect(() => {
-    if (!id) {
-      setNotFound(true);
-      setIsLoading(false);
-      return;
+    let isMounted = true;
+
+    async function loadDevice() {
+      if (!id) {
+        if (isMounted) {
+          setNotFound(true);
+          setLoadError(
+            'O identificador do dispositivo não foi informado.',
+          );
+          setIsLoading(false);
+        }
+
+        return;
+      }
+
+      setIsLoading(true);
+      setNotFound(false);
+      setLoadError('');
+
+      try {
+        const apiDevice =
+          await getDeviceById(id);
+
+        if (!isMounted) {
+          return;
+        }
+
+        setDevice(apiDevice);
+
+        reset({
+          brand: apiDevice.brand,
+          model: apiDevice.model,
+          storage: apiDevice.storage,
+          color: apiDevice.color,
+          imei: apiDevice.imei,
+          batteryHealth:
+            apiDevice.batteryHealth ?? undefined,
+          condition: apiDevice.condition,
+          purchasePrice:
+            apiDevice.purchasePrice,
+          salePrice: apiDevice.salePrice,
+          supplier:
+            apiDevice.supplier ?? '',
+          entryDate: apiDevice.entryDate,
+          status: apiDevice.status,
+          notes: apiDevice.notes ?? '',
+        });
+      } catch (error) {
+        if (!isMounted) {
+          return;
+        }
+
+        setDevice(null);
+
+        if (
+          error instanceof ApiError &&
+          error.status === 404
+        ) {
+          setNotFound(true);
+          setLoadError(
+            'O aparelho não existe ou foi excluído.',
+          );
+
+          return;
+        }
+
+        if (error instanceof ApiError) {
+          setLoadError(error.message);
+        } else {
+          setLoadError(
+            'Não foi possível carregar o dispositivo. Verifique se a API está funcionando.',
+          );
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
+      }
     }
 
-    const storedDevice = getDeviceById(id);
+    void loadDevice();
 
-    if (!storedDevice) {
-      setNotFound(true);
-      setIsLoading(false);
-      return;
-    }
-
-    setDevice(storedDevice);
-
-    reset({
-      brand: storedDevice.brand,
-      model: storedDevice.model,
-      storage: storedDevice.storage,
-      color: storedDevice.color,
-      imei: storedDevice.imei,
-      batteryHealth:
-        storedDevice.batteryHealth,
-      condition: storedDevice.condition,
-      purchasePrice:
-        storedDevice.purchasePrice,
-      salePrice: storedDevice.salePrice,
-      supplier: storedDevice.supplier ?? '',
-      entryDate: storedDevice.entryDate,
-      status: storedDevice.status,
-      notes: storedDevice.notes ?? '',
-    });
-
-    setIsLoading(false);
+    return () => {
+      isMounted = false;
+    };
   }, [id, reset]);
 
-  function handleEditDevice(
+  async function handleEditDevice(
     data: DeviceFormData,
   ) {
     if (!id || !device) {
       return;
     }
 
-    if (deviceExistsByImei(data.imei, id)) {
-      setError('imei', {
-        type: 'manual',
-        message:
-          'Já existe outro dispositivo cadastrado com este IMEI.',
-      });
+    setSubmitError('');
 
-      return;
+    try {
+      const updatedDevice =
+        await updateDevice(id, {
+          brand: data.brand,
+          model: data.model,
+          storage: data.storage,
+          color: data.color,
+          imei: data.imei,
+          batteryHealth:
+            data.batteryHealth,
+          condition: data.condition,
+          purchasePrice:
+            data.purchasePrice,
+          salePrice: data.salePrice,
+          supplier:
+            data.supplier || undefined,
+          entryDate: data.entryDate,
+          status: data.status,
+          notes:
+            data.notes || undefined,
+        });
+
+      setDevice(updatedDevice);
+
+      navigate(
+        `/dispositivos/${updatedDevice.id}`,
+        {
+          state: {
+            successMessage:
+              'Dispositivo atualizado com sucesso.',
+          },
+        },
+      );
+    } catch (error) {
+      if (error instanceof ApiError) {
+        const imeiError =
+          error.errors?.imei?.[0];
+
+        if (
+          imeiError ||
+          (error.status === 409 &&
+            error.message
+              .toLowerCase()
+              .includes('imei'))
+        ) {
+          setError('imei', {
+            type: 'server',
+            message:
+              imeiError ?? error.message,
+          });
+
+          return;
+        }
+
+        setSubmitError(error.message);
+        return;
+      }
+
+      console.error(
+        'Erro ao atualizar dispositivo:',
+        error,
+      );
+
+      setSubmitError(
+        'Não foi possível atualizar o dispositivo. Verifique a conexão com a API.',
+      );
     }
-
-    const updatedDevice: Device = {
-      ...device,
-      ...data,
-      supplier:
-        data.supplier || undefined,
-      notes: data.notes || undefined,
-    };
-
-    const result =
-      updateDevice(updatedDevice);
-
-    if (!result) {
-      return;
-    }
-
-    navigate('/dispositivos', {
-      state: {
-        successMessage:
-          'Dispositivo atualizado com sucesso.',
-      },
-    });
   }
 
   if (isLoading) {
     return (
       <main className="create-device">
-        <p>Carregando dispositivo...</p>
+        <section className="create-device__section">
+          <div className="create-device__heading-icon">
+            <Smartphone size={28} />
+          </div>
+
+          <h1>Carregando dispositivo...</h1>
+
+          <p>
+            Aguarde enquanto buscamos os dados do
+            aparelho.
+          </p>
+        </section>
       </main>
     );
   }
@@ -147,7 +252,8 @@ export function EditDevice() {
           <h1>Dispositivo não encontrado</h1>
 
           <p>
-            O aparelho não existe ou foi excluído.
+            {loadError ||
+              'O aparelho não existe ou foi excluído.'}
           </p>
 
           <Link
@@ -253,21 +359,27 @@ export function EditDevice() {
                 <option value="">
                   Selecione
                 </option>
+
                 <option value="32 GB">
                   32 GB
                 </option>
+
                 <option value="64 GB">
                   64 GB
                 </option>
+
                 <option value="128 GB">
                   128 GB
                 </option>
+
                 <option value="256 GB">
                   256 GB
                 </option>
+
                 <option value="512 GB">
                   512 GB
                 </option>
+
                 <option value="1 TB">
                   1 TB
                 </option>
@@ -309,6 +421,7 @@ export function EditDevice() {
                 type="text"
                 inputMode="numeric"
                 maxLength={15}
+                placeholder="Digite os 15 números"
                 {...register('imei', {
                   onChange: (event) => {
                     event.target.value =
@@ -374,9 +487,11 @@ export function EditDevice() {
                 <option value="NOVO">
                   Novo
                 </option>
+
                 <option value="SEMINOVO">
                   Seminovo
                 </option>
+
                 <option value="USADO">
                   Usado
                 </option>
@@ -401,13 +516,21 @@ export function EditDevice() {
                 <option value="DISPONIVEL">
                   Disponível
                 </option>
+
                 <option value="RESERVADO">
                   Reservado
                 </option>
+
                 <option value="VENDIDO">
                   Vendido
                 </option>
               </select>
+
+              {errors.status && (
+                <span className="create-device__error">
+                  {errors.status.message}
+                </span>
+              )}
             </div>
           </div>
         </section>
@@ -509,6 +632,12 @@ export function EditDevice() {
                 placeholder="Nome do fornecedor"
                 {...register('supplier')}
               />
+
+              {errors.supplier && (
+                <span className="create-device__error">
+                  {errors.supplier.message}
+                </span>
+              )}
             </div>
           </div>
         </section>
@@ -532,8 +661,23 @@ export function EditDevice() {
               rows={5}
               {...register('notes')}
             />
+
+            {errors.notes && (
+              <span className="create-device__error">
+                {errors.notes.message}
+              </span>
+            )}
           </div>
         </section>
+
+        {submitError && (
+          <div
+            className="create-device__submit-error"
+            role="alert"
+          >
+            {submitError}
+          </div>
+        )}
 
         <footer className="create-device__actions">
           <Link

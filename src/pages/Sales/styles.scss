@@ -434,4 +434,35 @@
     }
   }
 }
+.sales__load-error {
+  margin-top: 20px;
+  padding: 14px 16px;
+  border: 1px solid #fecaca;
+  border-radius: 10px;
+
+  color: #b91c1c;
+  background-color: #fef2f2;
+
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.sales__loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+
+  min-height: 260px;
+
+  color: #6b7280;
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.sales__filters input:disabled,
+.sales__filters select:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
 }

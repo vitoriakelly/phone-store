@@ -9,13 +9,17 @@ import {
   Smartphone,
   UserRound,
 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import {
+  useEffect,
+  useState,
+} from 'react';
 import {
   Link,
   useParams,
 } from 'react-router-dom';
 
-import { getSaleById } from '../../services/saleStorage';
+import { ApiError } from '../../services/api';
+import { getSaleById } from '../../services/saleApi';
 import type {
   PaymentMethod,
   Sale,
@@ -25,27 +29,38 @@ import { formatCurrency } from '../../utils/currency';
 import './styles.scss';
 
 function formatDate(date: string) {
-  return new Intl.DateTimeFormat('pt-BR').format(
+  return new Intl.DateTimeFormat(
+    'pt-BR',
+  ).format(
     new Date(`${date}T12:00:00`),
   );
 }
 
 function formatDateTime(date: string) {
-  return new Intl.DateTimeFormat('pt-BR', {
-    dateStyle: 'short',
-    timeStyle: 'short',
-  }).format(new Date(date));
+  return new Intl.DateTimeFormat(
+    'pt-BR',
+    {
+      dateStyle: 'short',
+      timeStyle: 'short',
+    },
+  ).format(new Date(date));
 }
 
 function getPaymentMethodLabel(
   paymentMethod: PaymentMethod,
 ) {
-  const labels: Record<PaymentMethod, string> = {
+  const labels: Record<
+    PaymentMethod,
+    string
+  > = {
     PIX: 'Pix',
     DINHEIRO: 'Dinheiro',
-    CARTAO_CREDITO: 'Cartão de crédito',
-    CARTAO_DEBITO: 'Cartão de débito',
-    TRANSFERENCIA: 'Transferência',
+    CARTAO_CREDITO:
+      'Cartão de crédito',
+    CARTAO_DEBITO:
+      'Cartão de débito',
+    TRANSFERENCIA:
+      'Transferência',
     OUTRO: 'Outro',
   };
 
@@ -61,16 +76,72 @@ export function SaleDetails() {
   const [isLoading, setIsLoading] =
     useState(true);
 
+  const [loadError, setLoadError] =
+    useState('');
+
   useEffect(() => {
-    if (!id) {
-      setIsLoading(false);
-      return;
+    let isMounted = true;
+
+    async function loadSale() {
+      if (!id) {
+        if (isMounted) {
+          setLoadError(
+            'O identificador da venda não foi informado.',
+          );
+
+          setIsLoading(false);
+        }
+
+        return;
+      }
+
+      setIsLoading(true);
+      setLoadError('');
+
+      try {
+        const apiSale =
+          await getSaleById(id);
+
+        if (!isMounted) {
+          return;
+        }
+
+        setSale(apiSale);
+      } catch (error) {
+        if (!isMounted) {
+          return;
+        }
+
+        setSale(null);
+
+        if (
+          error instanceof ApiError &&
+          error.status === 404
+        ) {
+          setLoadError(
+            'O registro solicitado não existe.',
+          );
+        } else if (
+          error instanceof ApiError
+        ) {
+          setLoadError(error.message);
+        } else {
+          setLoadError(
+            'Não foi possível carregar a venda. Verifique se a API está funcionando.',
+          );
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
+      }
     }
 
-    const storedSale = getSaleById(id);
+    void loadSale();
 
-    setSale(storedSale ?? null);
-    setIsLoading(false);
+    return () => {
+      isMounted = false;
+    };
   }, [id]);
 
   function handlePrintReceipt() {
@@ -80,7 +151,17 @@ export function SaleDetails() {
   if (isLoading) {
     return (
       <main className="sale-details">
-        <p>Carregando venda...</p>
+        <section className="sale-details__not-found">
+          <div className="sale-details__not-found-icon">
+            <BadgeDollarSign size={34} />
+          </div>
+
+          <h1>Carregando venda...</h1>
+
+          <p>
+            Aguarde enquanto buscamos os dados da venda.
+          </p>
+        </section>
       </main>
     );
   }
@@ -96,7 +177,8 @@ export function SaleDetails() {
           <h1>Venda não encontrada</h1>
 
           <p>
-            O registro solicitado não existe.
+            {loadError ||
+              'O registro solicitado não existe.'}
           </p>
 
           <Link to="/vendas">
@@ -109,7 +191,8 @@ export function SaleDetails() {
   }
 
   const profit =
-    sale.salePrice - sale.purchasePrice;
+    sale.salePrice -
+    sale.purchasePrice;
 
   return (
     <main className="sale-details">
@@ -153,20 +236,30 @@ export function SaleDetails() {
         <header className="sale-details__receipt-header">
           <div>
             <strong>Phone Store</strong>
-            <span>Comprovante de venda</span>
+            <span>
+              Comprovante de venda
+            </span>
           </div>
 
           <div className="sale-details__receipt-number">
-            <span>Identificação da venda</span>
+            <span>
+              Identificação da venda
+            </span>
+
             <strong>
-              #{sale.id.slice(0, 8).toUpperCase()}
+              #
+              {sale.id
+                .slice(0, 8)
+                .toUpperCase()}
             </strong>
           </div>
         </header>
 
         <section className="sale-details__section">
           <div className="sale-details__section-heading">
-            <h2>Informações do cliente</h2>
+            <h2>
+              Informações do cliente
+            </h2>
 
             <p>
               Dados informados no momento da venda.
@@ -178,7 +271,10 @@ export function SaleDetails() {
               <UserRound size={20} />
 
               <div>
-                <span>Nome do cliente</span>
+                <span>
+                  Nome do cliente
+                </span>
+
                 <strong>
                   {sale.customerName}
                 </strong>
@@ -190,6 +286,7 @@ export function SaleDetails() {
 
               <div>
                 <span>Telefone</span>
+
                 <strong>
                   {sale.customerPhone ||
                     'Não informado'}
@@ -214,6 +311,7 @@ export function SaleDetails() {
 
               <div>
                 <span>Dispositivo</span>
+
                 <strong>
                   {sale.deviceBrand}{' '}
                   {sale.deviceModel}
@@ -226,6 +324,7 @@ export function SaleDetails() {
 
               <div>
                 <span>IMEI</span>
+
                 <strong>
                   {sale.deviceImei}
                 </strong>
@@ -256,6 +355,7 @@ export function SaleDetails() {
 
               <div>
                 <span>Data da venda</span>
+
                 <strong>
                   {formatDate(sale.soldAt)}
                 </strong>
@@ -266,7 +366,10 @@ export function SaleDetails() {
               <CreditCard size={20} />
 
               <div>
-                <span>Forma de pagamento</span>
+                <span>
+                  Forma de pagamento
+                </span>
+
                 <strong>
                   {getPaymentMethodLabel(
                     sale.paymentMethod,
@@ -278,7 +381,9 @@ export function SaleDetails() {
 
           <div className="sale-details__price-grid">
             <article className="sale-details__price-card">
-              <span>Valor de compra</span>
+              <span>
+                Valor de compra
+              </span>
 
               <strong>
                 {formatCurrency(
@@ -288,15 +393,21 @@ export function SaleDetails() {
             </article>
 
             <article className="sale-details__price-card">
-              <span>Valor da venda</span>
+              <span>
+                Valor da venda
+              </span>
 
               <strong>
-                {formatCurrency(sale.salePrice)}
+                {formatCurrency(
+                  sale.salePrice,
+                )}
               </strong>
             </article>
 
             <article className="sale-details__price-card">
-              <span>Lucro obtido</span>
+              <span>
+                Lucro obtido
+              </span>
 
               <strong>
                 {formatCurrency(profit)}
@@ -323,7 +434,9 @@ export function SaleDetails() {
         <footer className="sale-details__receipt-footer">
           <span>
             Registro criado em{' '}
-            {formatDateTime(sale.createdAt)}
+            {formatDateTime(
+              sale.createdAt,
+            )}
           </span>
 
           <strong>

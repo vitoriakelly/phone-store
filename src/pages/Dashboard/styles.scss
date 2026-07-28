@@ -548,4 +548,44 @@
       grid-template-columns: 1fr;
     }
   }
+  .dashboard__load-error {
+  margin-bottom: 20px;
+  padding: 14px 16px;
+  border: 1px solid #fecaca;
+  border-radius: 10px;
+
+  color: #b91c1c;
+  background-color: #fef2f2;
+
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.dashboard__loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+
+  min-height: 320px;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+
+  color: #6b7280;
+  background-color: #ffffff;
+
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.dashboard__sale-details {
+  color: #2563eb;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+
+  &:hover {
+    text-decoration: underline;
+  }
+}
 }

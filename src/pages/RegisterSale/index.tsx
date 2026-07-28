@@ -4,7 +4,10 @@ import {
   BadgeDollarSign,
   Smartphone,
 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import {
+  useEffect,
+  useState,
+} from 'react';
 import { useForm } from 'react-hook-form';
 import {
   Link,
@@ -16,13 +19,10 @@ import {
   saleSchema,
   type SaleFormData,
 } from '../../schemas/saleSchema';
-import {
-  getDeviceById,
-  updateDeviceStatus,
-} from '../../services/deviceStorage';
-import { saveSale } from '../../services/saleStorage';
+import { ApiError } from '../../services/api';
+import { getDeviceById } from '../../services/deviceApi';
+import { createSale } from '../../services/saleApi';
 import type { Device } from '../../types/device';
-import type { Sale } from '../../types/sale';
 import { formatCurrency } from '../../utils/currency';
 
 import './styles.scss';
@@ -50,9 +50,19 @@ export function RegisterSale() {
   const [isLoading, setIsLoading] =
     useState(true);
 
+  const [notFound, setNotFound] =
+    useState(false);
+
+  const [loadError, setLoadError] =
+    useState('');
+
+  const [submitError, setSubmitError] =
+    useState('');
+
   const {
     register,
     reset,
+    setError,
     handleSubmit,
     formState: {
       errors,
@@ -60,6 +70,7 @@ export function RegisterSale() {
     },
   } = useForm<SaleFormData>({
     resolver: zodResolver(saleSchema),
+
     defaultValues: {
       customerName: '',
       customerPhone: '',
@@ -71,75 +82,168 @@ export function RegisterSale() {
   });
 
   useEffect(() => {
-    if (!id) {
-      setIsLoading(false);
-      return;
+    let isMounted = true;
+
+    async function loadDevice() {
+      if (!id) {
+        if (isMounted) {
+          setNotFound(true);
+
+          setLoadError(
+            'O identificador do dispositivo não foi informado.',
+          );
+
+          setIsLoading(false);
+        }
+
+        return;
+      }
+
+      setIsLoading(true);
+      setNotFound(false);
+      setLoadError('');
+
+      try {
+        const apiDevice =
+          await getDeviceById(id);
+
+        if (!isMounted) {
+          return;
+        }
+
+        setDevice(apiDevice);
+
+        reset({
+          customerName: '',
+          customerPhone: '',
+          salePrice: apiDevice.salePrice,
+          paymentMethod: 'PIX',
+          soldAt: getCurrentDate(),
+          notes: '',
+        });
+      } catch (error) {
+        if (!isMounted) {
+          return;
+        }
+
+        setDevice(null);
+
+        if (
+          error instanceof ApiError &&
+          error.status === 404
+        ) {
+          setNotFound(true);
+
+          setLoadError(
+            'O aparelho não existe ou foi excluído.',
+          );
+
+          return;
+        }
+
+        if (error instanceof ApiError) {
+          setLoadError(error.message);
+        } else {
+          setLoadError(
+            'Não foi possível carregar o dispositivo. Verifique se a API está funcionando.',
+          );
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
+      }
     }
 
-    const storedDevice = getDeviceById(id);
+    void loadDevice();
 
-    if (!storedDevice) {
-      setIsLoading(false);
-      return;
-    }
-
-    setDevice(storedDevice);
-
-    reset({
-      customerName: '',
-      customerPhone: '',
-      salePrice: storedDevice.salePrice,
-      paymentMethod: 'PIX',
-      soldAt: getCurrentDate(),
-      notes: '',
-    });
-
-    setIsLoading(false);
+    return () => {
+      isMounted = false;
+    };
   }, [id, reset]);
 
-  function handleRegisterSale(
+  async function handleRegisterSale(
     data: SaleFormData,
   ) {
     if (!device) {
       return;
     }
 
-    const sale: Sale = {
-      id: crypto.randomUUID(),
-      deviceId: device.id,
-      deviceBrand: device.brand,
-      deviceModel: device.model,
-      deviceImei: device.imei,
-      purchasePrice: device.purchasePrice,
-      salePrice: data.salePrice,
-      customerName: data.customerName,
-      customerPhone:
-        data.customerPhone || undefined,
-      paymentMethod: data.paymentMethod,
-      soldAt: data.soldAt,
-      notes: data.notes || undefined,
-      createdAt: new Date().toISOString(),
-    };
+    setSubmitError('');
 
-    saveSale(sale);
+    try {
+      await createSale({
+        deviceId: device.id,
+        customerName: data.customerName,
+        customerPhone:
+          data.customerPhone || undefined,
+        salePrice: data.salePrice,
+        paymentMethod: data.paymentMethod,
+        soldAt: data.soldAt,
+        notes: data.notes || undefined,
+      });
 
-    updateDeviceStatus(
-      device.id,
-      'VENDIDO',
-    );
+      navigate('/dispositivos', {
+        state: {
+          successMessage:
+            'Venda registrada com sucesso.',
+        },
+      });
+    } catch (error) {
+      if (error instanceof ApiError) {
+        const formFields: Array<
+          keyof SaleFormData
+        > = [
+          'customerName',
+          'customerPhone',
+          'salePrice',
+          'paymentMethod',
+          'soldAt',
+          'notes',
+        ];
 
-    navigate('/dispositivos', {
-      state: {
-        successMessage:
-          'Venda registrada com sucesso.',
-      },
-    });
+        for (const field of formFields) {
+          const fieldMessage =
+            error.errors?.[field]?.[0];
+
+          if (fieldMessage) {
+            setError(field, {
+              type: 'server',
+              message: fieldMessage,
+            });
+
+            return;
+          }
+        }
+
+        setSubmitError(error.message);
+        return;
+      }
+
+      console.error(
+        'Erro ao registrar venda:',
+        error,
+      );
+
+      setSubmitError(
+        'Não foi possível registrar a venda. Verifique a conexão com a API.',
+      );
+    }
   }
 
   if (isLoading) {
     return (
       <main className="register-sale">
-        <p>Carregando dispositivo...</p>
+        <section className="register-sale__not-found">
+          <Smartphone size={36} />
+
+          <h1>Carregando dispositivo...</h1>
+
+          <p>
+            Aguarde enquanto buscamos os dados do
+            aparelho.
+          </p>
+        </section>
       </main>
     );
   }
@@ -150,10 +254,15 @@ export function RegisterSale() {
         <section className="register-sale__not-found">
           <Smartphone size={36} />
 
-          <h1>Dispositivo não encontrado</h1>
+          <h1>
+            {notFound
+              ? 'Dispositivo não encontrado'
+              : 'Não foi possível carregar o dispositivo'}
+          </h1>
 
           <p>
-            O aparelho não existe ou foi excluído.
+            {loadError ||
+              'O aparelho não existe ou foi excluído.'}
           </p>
 
           <Link to="/dispositivos">
@@ -174,8 +283,8 @@ export function RegisterSale() {
           <h1>Dispositivo já vendido</h1>
 
           <p>
-            Este aparelho já está marcado como
-            vendido.
+            Este aparelho já possui uma venda
+            registrada.
           </p>
 
           <Link
@@ -204,8 +313,7 @@ export function RegisterSale() {
           <h1>Registrar venda</h1>
 
           <p>
-            Informe os dados da venda e do
-            cliente.
+            Informe os dados da venda e do cliente.
           </p>
         </div>
 
@@ -227,8 +335,8 @@ export function RegisterSale() {
           </strong>
 
           <p>
-            {device.storage} · {device.color} ·
-            IMEI {device.imei}
+            {device.storage} · {device.color} · IMEI{' '}
+            {device.imei}
           </p>
         </div>
 
@@ -253,8 +361,8 @@ export function RegisterSale() {
             <h2>Dados do cliente</h2>
 
             <p>
-              Identificação da pessoa que comprou
-              o aparelho.
+              Identificação da pessoa que comprou o
+              aparelho.
             </p>
           </div>
 
@@ -292,10 +400,7 @@ export function RegisterSale() {
 
               {errors.customerPhone && (
                 <span className="register-sale__error">
-                  {
-                    errors.customerPhone
-                      .message
-                  }
+                  {errors.customerPhone.message}
                 </span>
               )}
             </div>
@@ -348,7 +453,9 @@ export function RegisterSale() {
                 id="paymentMethod"
                 {...register('paymentMethod')}
               >
-                <option value="PIX">Pix</option>
+                <option value="PIX">
+                  Pix
+                </option>
 
                 <option value="DINHEIRO">
                   Dinheiro
@@ -373,10 +480,7 @@ export function RegisterSale() {
 
               {errors.paymentMethod && (
                 <span className="register-sale__error">
-                  {
-                    errors.paymentMethod
-                      .message
-                  }
+                  {errors.paymentMethod.message}
                 </span>
               )}
             </div>
@@ -406,8 +510,7 @@ export function RegisterSale() {
             <h2>Observações</h2>
 
             <p>
-              Informações adicionais sobre a
-              venda.
+              Informações adicionais sobre a venda.
             </p>
           </div>
 
@@ -430,6 +533,15 @@ export function RegisterSale() {
             )}
           </div>
         </section>
+
+        {submitError && (
+          <div
+            className="register-sale__submit-error"
+            role="alert"
+          >
+            {submitError}
+          </div>
+        )}
 
         <footer className="register-sale__actions">
           <Link

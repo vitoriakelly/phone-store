@@ -4,12 +4,20 @@ import {
   PackageCheck,
   Smartphone,
 } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import {
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
 import { Link } from 'react-router-dom';
 
 import { SummaryCard } from '../../components/SummaryCard';
-import { getDevices } from '../../services/deviceStorage';
-import { getSales } from '../../services/saleStorage';
+import { ApiError } from '../../services/api';
+import { listDevices } from '../../services/deviceApi';
+import {
+  listSales,
+  type SaleSummary,
+} from '../../services/saleApi';
 import type { Device } from '../../types/device';
 import type {
   PaymentMethod,
@@ -19,6 +27,12 @@ import { formatCurrency } from '../../utils/currency';
 
 import './styles.scss';
 
+const initialSaleSummary: SaleSummary = {
+  total: 0,
+  totalRevenue: 0,
+  totalProfit: 0,
+};
+
 function getStatusLabel(status: Device['status']) {
   const labels: Record<Device['status'], string> = {
     DISPONIVEL: 'Disponível',
@@ -27,6 +41,18 @@ function getStatusLabel(status: Device['status']) {
   };
 
   return labels[status];
+}
+
+function getConditionLabel(
+  condition: Device['condition'],
+) {
+  const labels: Record<Device['condition'], string> = {
+    NOVO: 'Novo',
+    SEMINOVO: 'Seminovo',
+    USADO: 'Usado',
+  };
+
+  return labels[condition];
 }
 
 function getPaymentMethodLabel(
@@ -54,15 +80,70 @@ export function Dashboard() {
   const [devices, setDevices] = useState<Device[]>([]);
   const [sales, setSales] = useState<Sale[]>([]);
 
+  const [saleSummary, setSaleSummary] =
+    useState<SaleSummary>(initialSaleSummary);
+
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
+
   useEffect(() => {
-    setDevices(getDevices());
-    setSales(getSales());
+    let isMounted = true;
+
+    async function loadDashboard() {
+      setIsLoading(true);
+      setLoadError('');
+
+      try {
+        const [
+          devicesResponse,
+          salesResponse,
+        ] = await Promise.all([
+          listDevices(),
+          listSales(),
+        ]);
+
+        if (!isMounted) {
+          return;
+        }
+
+        setDevices(devicesResponse);
+        setSales(salesResponse.data);
+        setSaleSummary(salesResponse.meta);
+      } catch (error) {
+        if (!isMounted) {
+          return;
+        }
+
+        setDevices([]);
+        setSales([]);
+        setSaleSummary(initialSaleSummary);
+
+        if (error instanceof ApiError) {
+          setLoadError(error.message);
+        } else {
+          setLoadError(
+            'Não foi possível carregar o Dashboard. Verifique se a API está funcionando.',
+          );
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
+      }
+    }
+
+    void loadDashboard();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   const availableDevices = useMemo(
     () =>
       devices.filter(
-        (device) => device.status === 'DISPONIVEL',
+        (device) =>
+          device.status === 'DISPONIVEL',
       ),
     [devices],
   );
@@ -70,7 +151,8 @@ export function Dashboard() {
   const reservedDevices = useMemo(
     () =>
       devices.filter(
-        (device) => device.status === 'RESERVADO',
+        (device) =>
+          device.status === 'RESERVADO',
       ),
     [devices],
   );
@@ -78,7 +160,8 @@ export function Dashboard() {
   const soldDevices = useMemo(
     () =>
       devices.filter(
-        (device) => device.status === 'VENDIDO',
+        (device) =>
+          device.status === 'VENDIDO',
       ),
     [devices],
   );
@@ -87,7 +170,8 @@ export function Dashboard() {
     () =>
       devices
         .filter(
-          (device) => device.status !== 'VENDIDO',
+          (device) =>
+            device.status !== 'VENDIDO',
         )
         .reduce(
           (total, device) =>
@@ -97,43 +181,27 @@ export function Dashboard() {
     [devices],
   );
 
-  const totalRevenue = useMemo(
-    () =>
-      sales.reduce(
-        (total, sale) =>
-          total + sale.salePrice,
-        0,
-      ),
-    [sales],
-  );
-
-  const totalProfit = useMemo(
-    () =>
-      sales.reduce(
-        (total, sale) =>
-          total +
-          (sale.salePrice - sale.purchasePrice),
-        0,
-      ),
-    [sales],
-  );
-
   const recentDevices = useMemo(
     () =>
       [...devices]
-        .sort((firstDevice, secondDevice) => {
-          const firstDate = new Date(
-            firstDevice.createdAt ??
-              firstDevice.entryDate,
-          ).getTime();
+        .sort(
+          (
+            firstDevice,
+            secondDevice,
+          ) => {
+            const firstDate = new Date(
+              firstDevice.createdAt ||
+                firstDevice.entryDate,
+            ).getTime();
 
-          const secondDate = new Date(
-            secondDevice.createdAt ??
-              secondDevice.entryDate,
-          ).getTime();
+            const secondDate = new Date(
+              secondDevice.createdAt ||
+                secondDevice.entryDate,
+            ).getTime();
 
-          return secondDate - firstDate;
-        })
+            return secondDate - firstDate;
+          },
+        )
         .slice(0, 5),
     [devices],
   );
@@ -142,7 +210,10 @@ export function Dashboard() {
     () =>
       [...sales]
         .sort(
-          (firstSale, secondSale) =>
+          (
+            firstSale,
+            secondSale,
+          ) =>
             new Date(
               secondSale.createdAt,
             ).getTime() -
@@ -153,6 +224,12 @@ export function Dashboard() {
         .slice(0, 5),
     [sales],
   );
+
+  const averageTicket =
+    saleSummary.total > 0
+      ? saleSummary.totalRevenue /
+        saleSummary.total
+      : 0;
 
   return (
     <main className="dashboard">
@@ -174,352 +251,408 @@ export function Dashboard() {
         </Link>
       </section>
 
-      <section className="dashboard__summary">
-        <SummaryCard
-          title="Total de aparelhos"
-          value={devices.length}
-          description={`${availableDevices.length} disponíveis e ${reservedDevices.length} reservados`}
-          icon={Smartphone}
-          variant="blue"
-        />
-
-        <SummaryCard
-          title="Disponíveis"
-          value={availableDevices.length}
-          description="Aparelhos disponíveis para venda"
-          icon={PackageCheck}
-          variant="green"
-        />
-
-        <SummaryCard
-          title="Aparelhos vendidos"
-          value={soldDevices.length}
-          description={`${sales.length} vendas registradas`}
-          icon={BadgeDollarSign}
-          variant="yellow"
-        />
-
-        <SummaryCard
-          title="Valor do estoque"
-          value={formatCurrency(inventoryValue)}
-          description="Valor potencial dos aparelhos não vendidos"
-          icon={CircleDollarSign}
-          variant="purple"
-        />
-      </section>
-
-      <section className="dashboard__financial">
-        <article className="dashboard__financial-card">
-          <span>Faturamento total</span>
-
-          <strong>
-            {formatCurrency(totalRevenue)}
-          </strong>
-
-          <small>
-            Soma dos valores finais das vendas
-          </small>
-        </article>
-
-        <article className="dashboard__financial-card">
-          <span>Lucro total</span>
-
-          <strong>
-            {formatCurrency(totalProfit)}
-          </strong>
-
-          <small>
-            Diferença entre vendas e compras
-          </small>
-        </article>
-
-        <article className="dashboard__financial-card">
-          <span>Ticket médio</span>
-
-          <strong>
-            {formatCurrency(
-              sales.length > 0
-                ? totalRevenue / sales.length
-                : 0,
-            )}
-          </strong>
-
-          <small>
-            Valor médio por venda registrada
-          </small>
-        </article>
-      </section>
-
-      <section className="dashboard__recent">
-        <div className="dashboard__section-header">
-          <div>
-            <h2>Últimos dispositivos</h2>
-
-            <p>
-              Aparelhos adicionados recentemente ao
-              estoque.
-            </p>
-          </div>
-
-          <Link to="/dispositivos">
-            Ver todos
-          </Link>
+      {loadError && (
+        <div
+          className="dashboard__load-error"
+          role="alert"
+        >
+          {loadError}
         </div>
+      )}
 
-        {recentDevices.length > 0 ? (
-          <>
-            <div className="dashboard__table-container">
-              <table className="dashboard__table">
-                <thead>
-                  <tr>
-                    <th>Dispositivo</th>
-                    <th>Armazenamento</th>
-                    <th>Entrada</th>
-                    <th>Valor</th>
-                    <th>Status</th>
-                    <th />
-                  </tr>
-                </thead>
+      {isLoading ? (
+        <div className="dashboard__loading">
+          <Smartphone size={30} />
 
-                <tbody>
-                  {recentDevices.map((device) => (
-                    <tr key={device.id}>
-                      <td>
-                        <div className="dashboard__device">
-                          <div className="dashboard__device-icon">
-                            <Smartphone size={20} />
+          <span>
+            Carregando informações do Dashboard...
+          </span>
+        </div>
+      ) : (
+        <>
+          <section className="dashboard__summary">
+            <SummaryCard
+              title="Total de aparelhos"
+              value={devices.length}
+              description={`${availableDevices.length} disponíveis e ${reservedDevices.length} reservados`}
+              icon={Smartphone}
+              variant="blue"
+            />
+
+            <SummaryCard
+              title="Disponíveis"
+              value={availableDevices.length}
+              description="Aparelhos disponíveis para venda"
+              icon={PackageCheck}
+              variant="green"
+            />
+
+            <SummaryCard
+              title="Aparelhos vendidos"
+              value={soldDevices.length}
+              description={`${saleSummary.total} vendas registradas`}
+              icon={BadgeDollarSign}
+              variant="yellow"
+            />
+
+            <SummaryCard
+              title="Valor do estoque"
+              value={formatCurrency(inventoryValue)}
+              description="Valor potencial dos aparelhos não vendidos"
+              icon={CircleDollarSign}
+              variant="purple"
+            />
+          </section>
+
+          <section className="dashboard__financial">
+            <article className="dashboard__financial-card">
+              <span>Faturamento total</span>
+
+              <strong>
+                {formatCurrency(
+                  saleSummary.totalRevenue,
+                )}
+              </strong>
+
+              <small>
+                Soma dos valores finais das vendas
+              </small>
+            </article>
+
+            <article className="dashboard__financial-card">
+              <span>Lucro total</span>
+
+              <strong>
+                {formatCurrency(
+                  saleSummary.totalProfit,
+                )}
+              </strong>
+
+              <small>
+                Diferença entre vendas e compras
+              </small>
+            </article>
+
+            <article className="dashboard__financial-card">
+              <span>Ticket médio</span>
+
+              <strong>
+                {formatCurrency(averageTicket)}
+              </strong>
+
+              <small>
+                Valor médio por venda registrada
+              </small>
+            </article>
+          </section>
+
+          <section className="dashboard__recent">
+            <div className="dashboard__section-header">
+              <div>
+                <h2>Últimos dispositivos</h2>
+
+                <p>
+                  Aparelhos adicionados recentemente ao
+                  estoque.
+                </p>
+              </div>
+
+              <Link to="/dispositivos">
+                Ver todos
+              </Link>
+            </div>
+
+            {recentDevices.length > 0 ? (
+              <>
+                <div className="dashboard__table-container">
+                  <table className="dashboard__table">
+                    <thead>
+                      <tr>
+                        <th>Dispositivo</th>
+                        <th>Armazenamento</th>
+                        <th>Entrada</th>
+                        <th>Valor</th>
+                        <th>Status</th>
+                        <th />
+                      </tr>
+                    </thead>
+
+                    <tbody>
+                      {recentDevices.map(
+                        (device) => (
+                          <tr key={device.id}>
+                            <td>
+                              <div className="dashboard__device">
+                                <div className="dashboard__device-icon">
+                                  <Smartphone
+                                    size={20}
+                                  />
+                                </div>
+
+                                <div>
+                                  <strong>
+                                    {device.brand}{' '}
+                                    {device.model}
+                                  </strong>
+
+                                  <span>
+                                    {device.color} ·{' '}
+                                    {getConditionLabel(
+                                      device.condition,
+                                    )}
+                                  </span>
+                                </div>
+                              </div>
+                            </td>
+
+                            <td>
+                              {device.storage}
+                            </td>
+
+                            <td>
+                              {formatDate(
+                                device.entryDate,
+                              )}
+                            </td>
+
+                            <td>
+                              {formatCurrency(
+                                device.salePrice,
+                              )}
+                            </td>
+
+                            <td>
+                              <span
+                                className={`dashboard__status dashboard__status--${device.status.toLowerCase()}`}
+                              >
+                                {getStatusLabel(
+                                  device.status,
+                                )}
+                              </span>
+                            </td>
+
+                            <td>
+                              <Link
+                                to={`/dispositivos/${device.id}`}
+                                className="dashboard__details"
+                              >
+                                Detalhes
+                              </Link>
+                            </td>
+                          </tr>
+                        ),
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="dashboard__mobile-list">
+                  {recentDevices.map(
+                    (device) => (
+                      <article
+                        key={device.id}
+                        className="dashboard__mobile-card"
+                      >
+                        <div className="dashboard__mobile-top">
+                          <div className="dashboard__device">
+                            <div className="dashboard__device-icon">
+                              <Smartphone
+                                size={20}
+                              />
+                            </div>
+
+                            <div>
+                              <strong>
+                                {device.brand}{' '}
+                                {device.model}
+                              </strong>
+
+                              <span>
+                                {device.storage} ·{' '}
+                                {device.color}
+                              </span>
+                            </div>
+                          </div>
+
+                          <span
+                            className={`dashboard__status dashboard__status--${device.status.toLowerCase()}`}
+                          >
+                            {getStatusLabel(
+                              device.status,
+                            )}
+                          </span>
+                        </div>
+
+                        <div className="dashboard__mobile-info">
+                          <div>
+                            <span>Entrada</span>
+
+                            <strong>
+                              {formatDate(
+                                device.entryDate,
+                              )}
+                            </strong>
                           </div>
 
                           <div>
-                            <strong>
-                              {device.brand}{' '}
-                              {device.model}
-                            </strong>
+                            <span>Valor</span>
 
-                            <span>
-                              {device.color} ·{' '}
-                              {device.condition}
-                            </span>
+                            <strong>
+                              {formatCurrency(
+                                device.salePrice,
+                              )}
+                            </strong>
                           </div>
                         </div>
-                      </td>
 
-                      <td>{device.storage}</td>
-
-                      <td>
-                        {formatDate(device.entryDate)}
-                      </td>
-
-                      <td>
-                        {formatCurrency(
-                          device.salePrice,
-                        )}
-                      </td>
-
-                      <td>
-                        <span
-                          className={`dashboard__status dashboard__status--${device.status.toLowerCase()}`}
-                        >
-                          {getStatusLabel(
-                            device.status,
-                          )}
-                        </span>
-                      </td>
-
-                      <td>
                         <Link
                           to={`/dispositivos/${device.id}`}
-                          className="dashboard__details"
+                          className="dashboard__mobile-details"
                         >
-                          Detalhes
+                          Ver detalhes
                         </Link>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                      </article>
+                    ),
+                  )}
+                </div>
+              </>
+            ) : (
+              <div className="dashboard__empty">
+                <Smartphone size={31} />
+
+                <h3>
+                  Nenhum dispositivo cadastrado
+                </h3>
+
+                <p>
+                  Cadastre o primeiro aparelho para
+                  começar a controlar o estoque.
+                </p>
+
+                <Link to="/dispositivos/cadastrar">
+                  Cadastrar dispositivo
+                </Link>
+              </div>
+            )}
+          </section>
+
+          <section className="dashboard__recent">
+            <div className="dashboard__section-header">
+              <div>
+                <h2>Vendas recentes</h2>
+
+                <p>
+                  Últimas vendas registradas no
+                  sistema.
+                </p>
+              </div>
+
+              <Link to="/vendas">
+                Ver vendas
+              </Link>
             </div>
 
-            <div className="dashboard__mobile-list">
-              {recentDevices.map((device) => (
-                <article
-                  key={device.id}
-                  className="dashboard__mobile-card"
-                >
-                  <div className="dashboard__mobile-top">
-                    <div className="dashboard__device">
-                      <div className="dashboard__device-icon">
-                        <Smartphone size={20} />
-                      </div>
+            {recentSales.length > 0 ? (
+              <div className="dashboard__sales-list">
+                {recentSales.map((sale) => {
+                  const profit =
+                    sale.salePrice -
+                    sale.purchasePrice;
 
-                      <div>
-                        <strong>
-                          {device.brand}{' '}
-                          {device.model}
-                        </strong>
-
-                        <span>
-                          {device.storage} ·{' '}
-                          {device.color}
-                        </span>
-                      </div>
-                    </div>
-
-                    <span
-                      className={`dashboard__status dashboard__status--${device.status.toLowerCase()}`}
+                  return (
+                    <article
+                      key={sale.id}
+                      className="dashboard__sale-card"
                     >
-                      {getStatusLabel(
-                        device.status,
-                      )}
-                    </span>
-                  </div>
+                      <div className="dashboard__sale-main">
+                        <div className="dashboard__sale-icon">
+                          <BadgeDollarSign
+                            size={21}
+                          />
+                        </div>
 
-                  <div className="dashboard__mobile-info">
-                    <div>
-                      <span>Entrada</span>
+                        <div>
+                          <strong>
+                            {sale.deviceBrand}{' '}
+                            {sale.deviceModel}
+                          </strong>
 
-                      <strong>
-                        {formatDate(device.entryDate)}
-                      </strong>
-                    </div>
+                          <span>
+                            Vendido para{' '}
+                            {sale.customerName}
+                          </span>
+                        </div>
+                      </div>
 
-                    <div>
-                      <span>Valor</span>
+                      <div className="dashboard__sale-data">
+                        <div>
+                          <span>Data</span>
 
-                      <strong>
-                        {formatCurrency(
-                          device.salePrice,
-                        )}
-                      </strong>
-                    </div>
-                  </div>
+                          <strong>
+                            {formatDate(
+                              sale.soldAt,
+                            )}
+                          </strong>
+                        </div>
 
-                  <Link
-                    to={`/dispositivos/${device.id}`}
-                    className="dashboard__mobile-details"
-                  >
-                    Ver detalhes
-                  </Link>
-                </article>
-              ))}
-            </div>
-          </>
-        ) : (
-          <div className="dashboard__empty">
-            <Smartphone size={31} />
+                        <div>
+                          <span>Pagamento</span>
 
-            <h3>Nenhum dispositivo cadastrado</h3>
+                          <strong>
+                            {getPaymentMethodLabel(
+                              sale.paymentMethod,
+                            )}
+                          </strong>
+                        </div>
 
-            <p>
-              Cadastre o primeiro aparelho para
-              começar a controlar o estoque.
-            </p>
+                        <div>
+                          <span>Valor</span>
 
-            <Link to="/dispositivos/cadastrar">
-              Cadastrar dispositivo
-            </Link>
-          </div>
-        )}
-      </section>
+                          <strong>
+                            {formatCurrency(
+                              sale.salePrice,
+                            )}
+                          </strong>
+                        </div>
 
-      <section className="dashboard__recent">
-        <div className="dashboard__section-header">
-          <div>
-            <h2>Vendas recentes</h2>
+                        <div>
+                          <span>Lucro</span>
 
-            <p>
-              Últimas vendas registradas no
-              sistema.
-            </p>
-          </div>
+                          <strong className="dashboard__sale-profit">
+                            {formatCurrency(
+                              profit,
+                            )}
+                          </strong>
+                        </div>
+                      </div>
 
-          <Link to="/vendas">Ver vendas</Link>
-        </div>
+                      <Link
+                        to={`/vendas/${sale.id}`}
+                        className="dashboard__sale-details"
+                      >
+                        Ver detalhes
+                      </Link>
+                    </article>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="dashboard__empty">
+                <BadgeDollarSign size={31} />
 
-        {recentSales.length > 0 ? (
-          <div className="dashboard__sales-list">
-            {recentSales.map((sale) => {
-              const profit =
-                sale.salePrice -
-                sale.purchasePrice;
+                <h3>
+                  Nenhuma venda registrada
+                </h3>
 
-              return (
-                <article
-                  key={sale.id}
-                  className="dashboard__sale-card"
-                >
-                  <div className="dashboard__sale-main">
-                    <div className="dashboard__sale-icon">
-                      <BadgeDollarSign size={21} />
-                    </div>
-
-                    <div>
-                      <strong>
-                        {sale.deviceBrand}{' '}
-                        {sale.deviceModel}
-                      </strong>
-
-                      <span>
-                        Vendido para{' '}
-                        {sale.customerName}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="dashboard__sale-data">
-                    <div>
-                      <span>Data</span>
-
-                      <strong>
-                        {formatDate(sale.soldAt)}
-                      </strong>
-                    </div>
-
-                    <div>
-                      <span>Pagamento</span>
-
-                      <strong>
-                        {getPaymentMethodLabel(
-                          sale.paymentMethod,
-                        )}
-                      </strong>
-                    </div>
-
-                    <div>
-                      <span>Valor</span>
-
-                      <strong>
-                        {formatCurrency(
-                          sale.salePrice,
-                        )}
-                      </strong>
-                    </div>
-
-                    <div>
-                      <span>Lucro</span>
-
-                      <strong className="dashboard__sale-profit">
-                        {formatCurrency(profit)}
-                      </strong>
-                    </div>
-                  </div>
-                </article>
-              );
-            })}
-          </div>
-        ) : (
-          <div className="dashboard__empty">
-            <BadgeDollarSign size={31} />
-
-            <h3>Nenhuma venda registrada</h3>
-
-            <p>
-              As vendas realizadas aparecerão
-              nesta área.
-            </p>
-          </div>
-        )}
-      </section>
+                <p>
+                  As vendas realizadas aparecerão
+                  nesta área.
+                </p>
+              </div>
+            )}
+          </section>
+        </>
+      )}
     </main>
   );
 }
