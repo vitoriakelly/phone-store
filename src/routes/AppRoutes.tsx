@@ -11,8 +11,9 @@ import { DeviceDetails } from '../pages/DeviceDetails';
 import { Devices } from '../pages/Devices';
 import { EditDevice } from '../pages/EditDevice';
 import { RegisterSale } from '../pages/RegisterSale';
-import { Sales } from '../pages/Sales';
+import { Reports } from '../pages/Reports';
 import { SaleDetails } from '../pages/SaleDetails';
+import { Sales } from '../pages/Sales';
 
 export function AppRoutes() {
   return (
@@ -52,15 +53,26 @@ export function AppRoutes() {
           path="/vendas"
           element={<Sales />}
         />
+
         <Route
           path="/vendas/:id"
           element={<SaleDetails />}
+        />
+
+        <Route
+          path="/relatorios"
+          element={<Reports />}
         />
       </Route>
 
       <Route
         path="*"
-        element={<Navigate to="/" replace />}
+        element={
+          <Navigate
+            to="/"
+            replace
+          />
+        }
       />
     </Routes>
   );

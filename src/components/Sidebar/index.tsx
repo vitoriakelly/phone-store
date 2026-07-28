@@ -1,5 +1,6 @@
 import {
   BadgeDollarSign,
+  FileBarChart2,
   LayoutDashboard,
   PlusCircle,
   Smartphone,
@@ -14,9 +15,16 @@ interface SidebarProps {
   onClose: () => void;
 }
 
-export function Sidebar({ isOpen, onClose }: SidebarProps) {
+export function Sidebar({
+  isOpen,
+  onClose,
+}: SidebarProps) {
   return (
-    <aside className={`sidebar ${isOpen ? 'sidebar--open' : ''}`}>
+    <aside
+      className={`sidebar ${
+        isOpen ? 'sidebar--open' : ''
+      }`}
+    >
       <div className="sidebar__header">
         <div className="sidebar__logo">
           <Smartphone size={24} />
@@ -43,7 +51,11 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
           end
           onClick={onClose}
           className={({ isActive }) =>
-            `sidebar__link ${isActive ? 'sidebar__link--active' : ''}`
+            `sidebar__link ${
+              isActive
+                ? 'sidebar__link--active'
+                : ''
+            }`
           }
         >
           <LayoutDashboard size={20} />
@@ -54,7 +66,11 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
           to="/dispositivos"
           onClick={onClose}
           className={({ isActive }) =>
-            `sidebar__link ${isActive ? 'sidebar__link--active' : ''}`
+            `sidebar__link ${
+              isActive
+                ? 'sidebar__link--active'
+                : ''
+            }`
           }
         >
           <Smartphone size={20} />
@@ -65,24 +81,45 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
           to="/dispositivos/cadastrar"
           onClick={onClose}
           className={({ isActive }) =>
-            `sidebar__link ${isActive ? 'sidebar__link--active' : ''}`
+            `sidebar__link ${
+              isActive
+                ? 'sidebar__link--active'
+                : ''
+            }`
           }
         >
           <PlusCircle size={20} />
           <span>Novo dispositivo</span>
         </NavLink>
+
         <NavLink
           to="/vendas"
           onClick={onClose}
           className={({ isActive }) =>
-            `sidebar__link ${isActive
-              ? 'sidebar__link--active'
-              : ''
+            `sidebar__link ${
+              isActive
+                ? 'sidebar__link--active'
+                : ''
             }`
           }
         >
           <BadgeDollarSign size={20} />
           <span>Vendas</span>
+        </NavLink>
+
+        <NavLink
+          to="/relatorios"
+          onClick={onClose}
+          className={({ isActive }) =>
+            `sidebar__link ${
+              isActive
+                ? 'sidebar__link--active'
+                : ''
+            }`
+          }
+        >
+          <FileBarChart2 size={20} />
+          <span>Relatórios</span>
         </NavLink>
       </nav>
 
