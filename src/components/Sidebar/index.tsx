@@ -4,9 +4,12 @@ import {
   LayoutDashboard,
   PlusCircle,
   Smartphone,
+  Users,
   X,
 } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
+
+import { useAuth } from '../../contexts/AuthContext';
 
 import './styles.scss';
 
@@ -19,6 +22,8 @@ export function Sidebar({
   isOpen,
   onClose,
 }: SidebarProps) {
+  const { isMaster } = useAuth();
+
   return (
     <aside
       className={`sidebar ${
@@ -107,20 +112,39 @@ export function Sidebar({
           <span>Vendas</span>
         </NavLink>
 
-        <NavLink
-          to="/relatorios"
-          onClick={onClose}
-          className={({ isActive }) =>
-            `sidebar__link ${
-              isActive
-                ? 'sidebar__link--active'
-                : ''
-            }`
-          }
-        >
-          <FileBarChart2 size={20} />
-          <span>Relatórios</span>
-        </NavLink>
+        {isMaster && (
+          <>
+            <NavLink
+              to="/relatorios"
+              onClick={onClose}
+              className={({ isActive }) =>
+                `sidebar__link ${
+                  isActive
+                    ? 'sidebar__link--active'
+                    : ''
+                }`
+              }
+            >
+              <FileBarChart2 size={20} />
+              <span>Relatórios</span>
+            </NavLink>
+
+            <NavLink
+              to="/funcionarios"
+              onClick={onClose}
+              className={({ isActive }) =>
+                `sidebar__link ${
+                  isActive
+                    ? 'sidebar__link--active'
+                    : ''
+                }`
+              }
+            >
+              <Users size={20} />
+              <span>Funcionários</span>
+            </NavLink>
+          </>
+        )}
       </nav>
 
       <footer className="sidebar__footer">

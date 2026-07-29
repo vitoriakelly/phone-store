@@ -10,59 +10,77 @@ import { Dashboard } from '../pages/Dashboard';
 import { DeviceDetails } from '../pages/DeviceDetails';
 import { Devices } from '../pages/Devices';
 import { EditDevice } from '../pages/EditDevice';
+import { Employees } from '../pages/Employees';
+import { Login } from '../pages/Login';
 import { RegisterSale } from '../pages/RegisterSale';
 import { Reports } from '../pages/Reports';
 import { SaleDetails } from '../pages/SaleDetails';
 import { Sales } from '../pages/Sales';
+import { MasterRoute } from './MasterRoute';
+import { ProtectedRoute } from './ProtectedRoute';
 
 export function AppRoutes() {
   return (
     <Routes>
-      <Route element={<Layout />}>
-        <Route
-          path="/"
-          element={<Dashboard />}
-        />
+      <Route
+        path="/login"
+        element={<Login />}
+      />
 
-        <Route
-          path="/dispositivos"
-          element={<Devices />}
-        />
+      <Route element={<ProtectedRoute />}>
+        <Route element={<Layout />}>
+          <Route
+            path="/"
+            element={<Dashboard />}
+          />
 
-        <Route
-          path="/dispositivos/cadastrar"
-          element={<CreateDevice />}
-        />
+          <Route
+            path="/dispositivos"
+            element={<Devices />}
+          />
 
-        <Route
-          path="/dispositivos/:id/editar"
-          element={<EditDevice />}
-        />
+          <Route
+            path="/dispositivos/cadastrar"
+            element={<CreateDevice />}
+          />
 
-        <Route
-          path="/dispositivos/:id/vender"
-          element={<RegisterSale />}
-        />
+          <Route
+            path="/dispositivos/:id/editar"
+            element={<EditDevice />}
+          />
 
-        <Route
-          path="/dispositivos/:id"
-          element={<DeviceDetails />}
-        />
+          <Route
+            path="/dispositivos/:id/vender"
+            element={<RegisterSale />}
+          />
 
-        <Route
-          path="/vendas"
-          element={<Sales />}
-        />
+          <Route
+            path="/dispositivos/:id"
+            element={<DeviceDetails />}
+          />
 
-        <Route
-          path="/vendas/:id"
-          element={<SaleDetails />}
-        />
+          <Route
+            path="/vendas"
+            element={<Sales />}
+          />
 
-        <Route
-          path="/relatorios"
-          element={<Reports />}
-        />
+          <Route
+            path="/vendas/:id"
+            element={<SaleDetails />}
+          />
+
+          <Route element={<MasterRoute />}>
+            <Route
+              path="/relatorios"
+              element={<Reports />}
+            />
+
+            <Route
+              path="/funcionarios"
+              element={<Employees />}
+            />
+          </Route>
+        </Route>
       </Route>
 
       <Route
