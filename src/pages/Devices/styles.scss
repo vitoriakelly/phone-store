@@ -423,6 +423,15 @@
       }
     }
 
+    &--sell {
+      color: #15803d;
+      background-color: #f0fdf4;
+
+      &:hover {
+        background-color: #dcfce7;
+      }
+    }
+
     &--delete {
       color: #dc2626;
       background-color: #fef2f2;
@@ -592,7 +601,11 @@
 
     &__card-actions {
       display: grid;
-      grid-template-columns: 1fr 1fr;
+      grid-template-columns:
+        repeat(
+          auto-fit,
+          minmax(140px, 1fr)
+        );
       gap: 10px;
 
       margin-top: 18px;
@@ -615,6 +628,15 @@
       a {
         color: #2563eb;
         background-color: #eff6ff;
+      }
+
+      .devices__card-action--sell {
+        color: #15803d;
+        background-color: #f0fdf4;
+
+        &:hover {
+          background-color: #dcfce7;
+        }
       }
 
       button {

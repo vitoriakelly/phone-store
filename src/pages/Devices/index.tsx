@@ -1,4 +1,5 @@
 import {
+  BadgeDollarSign,
   CalendarDays,
   Eye,
   Plus,
@@ -621,6 +622,22 @@ export function Devices() {
                             deletingDeviceId ===
                             device.id;
 
+                          const canRegisterSale =
+                            (
+                              device.status ===
+                                'DISPONIVEL' ||
+                              device.status ===
+                                'RESERVADO'
+                            ) &&
+                            Boolean(
+                              device.imei,
+                            ) &&
+                            Boolean(
+                              device.color,
+                            ) &&
+                            device.salePrice !==
+                              null;
+
                           return (
                             <tr
                               key={
@@ -720,6 +737,21 @@ export function Devices() {
                                     />
                                   </Link>
 
+                                  {canRegisterSale && (
+                                    <Link
+                                      to={`/dispositivos/${device.id}/vender`}
+                                      className="devices__action devices__action--sell"
+                                      aria-label={`Registrar venda de ${device.brand} ${device.model}`}
+                                      title="Registrar venda"
+                                    >
+                                      <BadgeDollarSign
+                                        size={
+                                          18
+                                        }
+                                      />
+                                    </Link>
+                                  )}
+
                                   <button
                                     type="button"
                                     className="devices__action devices__action--delete"
@@ -756,6 +788,22 @@ export function Devices() {
                       const isDeleting =
                         deletingDeviceId ===
                         device.id;
+
+                      const canRegisterSale =
+                        (
+                          device.status ===
+                            'DISPONIVEL' ||
+                          device.status ===
+                            'RESERVADO'
+                        ) &&
+                        Boolean(
+                          device.imei,
+                        ) &&
+                        Boolean(
+                          device.color,
+                        ) &&
+                        device.salePrice !==
+                          null;
 
                       return (
                         <article
@@ -870,6 +918,19 @@ export function Devices() {
 
                               Ver detalhes
                             </Link>
+
+                            {canRegisterSale && (
+                              <Link
+                                to={`/dispositivos/${device.id}/vender`}
+                                className="devices__card-action--sell"
+                              >
+                                <BadgeDollarSign
+                                  size={18}
+                                />
+
+                                Registrar venda
+                              </Link>
+                            )}
 
                             <button
                               type="button"
