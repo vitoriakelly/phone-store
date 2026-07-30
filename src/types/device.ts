@@ -1,4 +1,5 @@
 export type DeviceStatus =
+  | 'PENDENTE_INFORMACOES'
   | 'DISPONIVEL'
   | 'RESERVADO'
   | 'VENDIDO';
@@ -13,16 +14,24 @@ export interface Device {
   brand: string;
   model: string;
   storage: string;
-  color: string;
-  imei: string;
-  batteryHealth?: number | null;
+
+  color: string | null;
+  imei: string | null;
+
+  batteryHealth: number | null;
+
   condition: DeviceCondition;
+
   purchasePrice: number;
-  salePrice: number;
-  supplier?: string | null;
+  salePrice: number | null;
+
+  supplier: string | null;
+
   entryDate: string;
   status: DeviceStatus;
-  notes?: string | null;
+
+  notes: string | null;
+
   createdAt: string;
-  updatedAt?: string;
+  updatedAt: string;
 }

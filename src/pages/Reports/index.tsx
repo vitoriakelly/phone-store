@@ -129,12 +129,13 @@ function getPaymentMethodLabel(
       'Cartão de débito',
     TRANSFERENCIA:
       'Transferência',
+    TROCA_DISPOSITIVO:
+      'Troca de dispositivo',
     OUTRO: 'Outro',
   };
 
   return labels[paymentMethod];
 }
-
 function getDeviceStatusLabel(
   status: Device['status'],
 ) {
@@ -142,6 +143,8 @@ function getDeviceStatusLabel(
     Device['status'],
     string
   > = {
+    PENDENTE_INFORMACOES:
+      'Pendente de informações',
     DISPONIVEL: 'Disponível',
     RESERVADO: 'Reservado',
     VENDIDO: 'Vendido',
@@ -163,6 +166,15 @@ function getDeviceConditionLabel(
   };
 
   return labels[condition];
+}
+function formatNullableCurrency(
+  value: number | null,
+) {
+  if (value === null) {
+    return 'Pendente';
+  }
+
+  return formatCurrency(value);
 }
 
 function escapeHtml(
@@ -398,10 +410,10 @@ export function Reports() {
               <span>Faturamento</span>
               <strong>
                 ${escapeHtml(
-                  formatCurrency(
-                    salesMeta.totalRevenue,
-                  ),
-                )}
+          formatCurrency(
+            salesMeta.totalRevenue,
+          ),
+        )}
               </strong>
             </article>
 
@@ -409,10 +421,10 @@ export function Reports() {
               <span>Custo total</span>
               <strong>
                 ${escapeHtml(
-                  formatCurrency(
-                    salesMeta.totalCost,
-                  ),
-                )}
+          formatCurrency(
+            salesMeta.totalCost,
+          ),
+        )}
               </strong>
             </article>
 
@@ -420,10 +432,10 @@ export function Reports() {
               <span>Lucro total</span>
               <strong>
                 ${escapeHtml(
-                  formatCurrency(
-                    salesMeta.totalProfit,
-                  ),
-                )}
+          formatCurrency(
+            salesMeta.totalProfit,
+          ),
+        )}
               </strong>
             </article>
 
@@ -431,10 +443,10 @@ export function Reports() {
               <span>Ticket médio</span>
               <strong>
                 ${escapeHtml(
-                  formatCurrency(
-                    salesMeta.averageTicket,
-                  ),
-                )}
+          formatCurrency(
+            salesMeta.averageTicket,
+          ),
+        )}
               </strong>
             </article>
           </section>
@@ -480,11 +492,11 @@ export function Reports() {
 
               <strong>
                 ${escapeHtml(
-                  formatCurrency(
-                    devicesMeta
-                      .totalPurchaseValue,
-                  ),
-                )}
+          formatCurrency(
+            devicesMeta
+              .totalPurchaseValue,
+          ),
+        )}
               </strong>
             </article>
 
@@ -493,11 +505,11 @@ export function Reports() {
 
               <strong>
                 ${escapeHtml(
-                  formatCurrency(
-                    devicesMeta
-                      .totalSaleValue,
-                  ),
-                )}
+          formatCurrency(
+            devicesMeta
+              .totalSaleValue,
+          ),
+        )}
               </strong>
             </article>
 
@@ -506,11 +518,11 @@ export function Reports() {
 
               <strong>
                 ${escapeHtml(
-                  formatCurrency(
-                    devicesMeta
-                      .potentialProfit,
-                  ),
-                )}
+          formatCurrency(
+            devicesMeta
+              .potentialProfit,
+          ),
+        )}
               </strong>
             </article>
           </section>
@@ -519,146 +531,146 @@ export function Reports() {
     const tableRows =
       isSalesReport
         ? sales
-            .map((sale) => {
-              const profit =
-                sale.salePrice -
-                sale.purchasePrice;
+          .map((sale) => {
+            const profit =
+              sale.salePrice -
+              sale.purchasePrice;
 
-              return `
+            return `
                 <tr>
                   <td>
                     ${escapeHtml(
-                      formatDate(
-                        sale.soldAt,
-                      ),
-                    )}
+              formatDate(
+                sale.soldAt,
+              ),
+            )}
                   </td>
 
                   <td>
                     ${escapeHtml(
-                      `${sale.deviceBrand} ${sale.deviceModel}`,
-                    )}
+              `${sale.deviceBrand} ${sale.deviceModel}`,
+            )}
                   </td>
 
                   <td>
                     ${escapeHtml(
-                      sale.deviceImei,
-                    )}
+              sale.deviceImei,
+            )}
                   </td>
 
                   <td>
                     ${escapeHtml(
-                      sale.customerName,
-                    )}
+              sale.customerName,
+            )}
                   </td>
 
                   <td>
                     ${escapeHtml(
-                      getPaymentMethodLabel(
-                        sale.paymentMethod,
-                      ),
-                    )}
+              getPaymentMethodLabel(
+                sale.paymentMethod,
+              ),
+            )}
                   </td>
 
                   <td>
                     ${escapeHtml(
-                      formatCurrency(
-                        sale.purchasePrice,
-                      ),
-                    )}
+              formatCurrency(
+                sale.purchasePrice,
+              ),
+            )}
                   </td>
 
                   <td>
                     ${escapeHtml(
-                      formatCurrency(
-                        sale.salePrice,
-                      ),
-                    )}
+              formatCurrency(
+                sale.salePrice,
+              ),
+            )}
                   </td>
 
                   <td>
                     ${escapeHtml(
-                      formatCurrency(
-                        profit,
-                      ),
-                    )}
+              formatCurrency(
+                profit,
+              ),
+            )}
                   </td>
                 </tr>
               `;
-            })
-            .join('')
+          })
+          .join('')
         : devices
-            .map(
-              (device) => `
+          .map(
+            (device) => `
                 <tr>
                   <td>
                     ${escapeHtml(
-                      formatDate(
-                        device.entryDate,
-                      ),
-                    )}
+              formatDate(
+                device.entryDate,
+              ),
+            )}
                   </td>
 
                   <td>
                     ${escapeHtml(
-                      `${device.brand} ${device.model}`,
-                    )}
+              `${device.brand} ${device.model}`,
+            )}
                   </td>
 
                   <td>
                     ${escapeHtml(
-                      device.storage,
-                    )}
+              device.storage,
+            )}
                   </td>
 
                   <td>
                     ${escapeHtml(
-                      device.imei,
-                    )}
+              device.imei,
+            )}
                   </td>
 
                   <td>
                     ${escapeHtml(
-                      device.supplier ||
-                        'Não informado',
-                    )}
+              device.supplier ||
+              'Não informado',
+            )}
                   </td>
 
                   <td>
                     ${escapeHtml(
-                      getDeviceConditionLabel(
-                        device.condition,
-                      ),
-                    )}
+              getDeviceConditionLabel(
+                device.condition,
+              ),
+            )}
                   </td>
 
                   <td>
                     ${escapeHtml(
-                      getDeviceStatusLabel(
-                        device.status,
-                      ),
-                    )}
+              getDeviceStatusLabel(
+                device.status,
+              ),
+            )}
                   </td>
 
                   <td>
                     ${escapeHtml(
-                      formatCurrency(
-                        device.purchasePrice,
-                      ),
-                    )}
+              formatCurrency(
+                device.purchasePrice,
+              ),
+            )}
                   </td>
 
                   <td>
                     ${escapeHtml(
-                      formatCurrency(
-                        device.salePrice,
-                      ),
-                    )}
+              formatNullableCurrency(
+                device.salePrice,
+              ),
+            )}
                   </td>
                 </tr>
               `,
-            )
-            .join('');
+          )
+          .join('');
 
     const tableHeader =
       isSalesReport
@@ -862,8 +874,8 @@ export function Reports() {
             <div>
               <h1>
                 ${escapeHtml(
-                  reportTitle,
-                )}
+      reportTitle,
+    )}
               </h1>
 
               <p>
@@ -1507,8 +1519,8 @@ export function Reports() {
                         status:
                           event.target.value
                             ? (event
-                                .target
-                                .value as Device['status'])
+                              .target
+                              .value as Device['status'])
                             : undefined,
                       }),
                     )
@@ -1517,7 +1529,9 @@ export function Reports() {
                   <option value="">
                     Todos
                   </option>
-
+                  <option value="PENDENTE_INFORMACOES">
+                    Pendente de informações
+                  </option>
                   <option value="DISPONIVEL">
                     Disponível
                   </option>
@@ -1724,7 +1738,7 @@ export function Reports() {
                           </td>
 
                           <td>
-                            {formatCurrency(
+                            {formatNullableCurrency(
                               device.salePrice,
                             )}
                           </td>

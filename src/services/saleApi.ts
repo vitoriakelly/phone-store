@@ -1,19 +1,9 @@
 import type {
-  PaymentMethod,
+  CreateSaleInput,
   Sale,
 } from '../types/sale';
 
 import { apiRequest } from './api';
-
-export interface CreateSaleInput {
-  deviceId: string;
-  customerName: string;
-  customerPhone?: string;
-  salePrice: number;
-  paymentMethod: PaymentMethod;
-  soldAt: string;
-  notes?: string;
-}
 
 export interface SaleSummary {
   total: number;
@@ -51,7 +41,9 @@ export async function createSale(
 }
 
 export async function listSales(): Promise<SaleListResponse> {
-  return apiRequest<SaleListResponse>('/sales');
+  return apiRequest<SaleListResponse>(
+    '/sales',
+  );
 }
 
 export async function getSaleById(

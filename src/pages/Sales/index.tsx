@@ -48,19 +48,21 @@ function getPaymentMethodLabel(
   paymentMethod: PaymentMethod,
 ) {
   const labels: Record<
-    PaymentMethod,
-    string
-  > = {
-    PIX: 'Pix',
-    DINHEIRO: 'Dinheiro',
-    CARTAO_CREDITO:
-      'Cartão de crédito',
-    CARTAO_DEBITO:
-      'Cartão de débito',
-    TRANSFERENCIA:
-      'Transferência',
-    OUTRO: 'Outro',
-  };
+  PaymentMethod,
+  string
+> = {
+  PIX: 'Pix',
+  DINHEIRO: 'Dinheiro',
+  CARTAO_CREDITO:
+    'Cartão de crédito',
+  CARTAO_DEBITO:
+    'Cartão de débito',
+  TRANSFERENCIA:
+    'Transferência',
+  TROCA_DISPOSITIVO:
+    'Troca de dispositivo',
+  OUTRO: 'Outro',
+};
 
   return labels[paymentMethod];
 }

@@ -1,4 +1,5 @@
 import {
+  AlertCircle,
   BadgeDollarSign,
   CircleDollarSign,
   PackageCheck,
@@ -33,8 +34,15 @@ const initialSaleSummary: SaleSummary = {
   totalProfit: 0,
 };
 
-function getStatusLabel(status: Device['status']) {
-  const labels: Record<Device['status'], string> = {
+function getStatusLabel(
+  status: Device['status'],
+) {
+  const labels: Record<
+    Device['status'],
+    string
+  > = {
+    PENDENTE_INFORMACOES:
+      'Pendente de informações',
     DISPONIVEL: 'Disponível',
     RESERVADO: 'Reservado',
     VENDIDO: 'Vendido',
@@ -46,7 +54,10 @@ function getStatusLabel(status: Device['status']) {
 function getConditionLabel(
   condition: Device['condition'],
 ) {
-  const labels: Record<Device['condition'], string> = {
+  const labels: Record<
+    Device['condition'],
+    string
+  > = {
     NOVO: 'Novo',
     SEMINOVO: 'Seminovo',
     USADO: 'Usado',
@@ -58,33 +69,68 @@ function getConditionLabel(
 function getPaymentMethodLabel(
   paymentMethod: PaymentMethod,
 ) {
-  const labels: Record<PaymentMethod, string> = {
+  const labels = {
     PIX: 'Pix',
     DINHEIRO: 'Dinheiro',
-    CARTAO_CREDITO: 'Cartão de crédito',
-    CARTAO_DEBITO: 'Cartão de débito',
-    TRANSFERENCIA: 'Transferência',
+    CARTAO_CREDITO:
+      'Cartão de crédito',
+    CARTAO_DEBITO:
+      'Cartão de débito',
+    TRANSFERENCIA:
+      'Transferência',
+    TROCA_DISPOSITIVO:
+      'Troca de dispositivo',
     OUTRO: 'Outro',
-  };
+  } as const;
 
-  return labels[paymentMethod];
+  return (
+    labels[
+      paymentMethod as keyof typeof labels
+    ] ?? paymentMethod
+  );
 }
 
 function formatDate(date: string) {
-  return new Intl.DateTimeFormat('pt-BR').format(
+  return new Intl.DateTimeFormat(
+    'pt-BR',
+  ).format(
     new Date(`${date}T12:00:00`),
   );
 }
 
+function formatNullableCurrency(
+  value: number | null,
+) {
+  if (value === null) {
+    return 'Pendente';
+  }
+
+  return formatCurrency(value);
+}
+
+function getDeviceColor(
+  color: string | null,
+) {
+  return color || 'Cor pendente';
+}
+
 export function Dashboard() {
-  const [devices, setDevices] = useState<Device[]>([]);
-  const [sales, setSales] = useState<Sale[]>([]);
+  const [devices, setDevices] =
+    useState<Device[]>([]);
+
+  const [sales, setSales] =
+    useState<Sale[]>([]);
 
   const [saleSummary, setSaleSummary] =
-    useState<SaleSummary>(initialSaleSummary);
+    useState<SaleSummary>(
+      initialSaleSummary,
+    );
 
-  const [isLoading, setIsLoading] = useState(true);
-  const [loadError, setLoadError] = useState('');
+  const [isLoading, setIsLoading] =
+    useState(true);
+
+  const [loadError, setLoadError] =
+    useState('');
 
   useEffect(() => {
     let isMounted = true;
@@ -108,7 +154,9 @@ export function Dashboard() {
 
         setDevices(devicesResponse);
         setSales(salesResponse.data);
-        setSaleSummary(salesResponse.meta);
+        setSaleSummary(
+          salesResponse.meta,
+        );
       } catch (error) {
         if (!isMounted) {
           return;
@@ -116,7 +164,9 @@ export function Dashboard() {
 
         setDevices([]);
         setSales([]);
-        setSaleSummary(initialSaleSummary);
+        setSaleSummary(
+          initialSaleSummary,
+        );
 
         if (error instanceof ApiError) {
           setLoadError(error.message);
@@ -139,11 +189,22 @@ export function Dashboard() {
     };
   }, []);
 
+  const pendingDevices = useMemo(
+    () =>
+      devices.filter(
+        (device) =>
+          device.status ===
+          'PENDENTE_INFORMACOES',
+      ),
+    [devices],
+  );
+
   const availableDevices = useMemo(
     () =>
       devices.filter(
         (device) =>
-          device.status === 'DISPONIVEL',
+          device.status ===
+          'DISPONIVEL',
       ),
     [devices],
   );
@@ -152,7 +213,8 @@ export function Dashboard() {
     () =>
       devices.filter(
         (device) =>
-          device.status === 'RESERVADO',
+          device.status ===
+          'RESERVADO',
       ),
     [devices],
   );
@@ -171,11 +233,13 @@ export function Dashboard() {
       devices
         .filter(
           (device) =>
-            device.status !== 'VENDIDO',
+            device.status !==
+            'VENDIDO',
         )
         .reduce(
           (total, device) =>
-            total + device.salePrice,
+            total +
+            (device.salePrice ?? 0),
           0,
         ),
     [devices],
@@ -189,17 +253,22 @@ export function Dashboard() {
             firstDevice,
             secondDevice,
           ) => {
-            const firstDate = new Date(
-              firstDevice.createdAt ||
-                firstDevice.entryDate,
-            ).getTime();
+            const firstDate =
+              new Date(
+                firstDevice.createdAt ||
+                  firstDevice.entryDate,
+              ).getTime();
 
-            const secondDate = new Date(
-              secondDevice.createdAt ||
-                secondDevice.entryDate,
-            ).getTime();
+            const secondDate =
+              new Date(
+                secondDevice.createdAt ||
+                  secondDevice.entryDate,
+              ).getTime();
 
-            return secondDate - firstDate;
+            return (
+              secondDate -
+              firstDate
+            );
           },
         )
         .slice(0, 5),
@@ -238,8 +307,8 @@ export function Dashboard() {
           <h1>Dashboard</h1>
 
           <p>
-            Acompanhe o estoque e as movimentações
-            da loja.
+            Acompanhe o estoque e as
+            movimentações da loja.
           </p>
         </div>
 
@@ -265,7 +334,8 @@ export function Dashboard() {
           <Smartphone size={30} />
 
           <span>
-            Carregando informações do Dashboard...
+            Carregando informações do
+            Dashboard...
           </span>
         </div>
       ) : (
@@ -274,31 +344,37 @@ export function Dashboard() {
             <SummaryCard
               title="Total de aparelhos"
               value={devices.length}
-              description={`${availableDevices.length} disponíveis e ${reservedDevices.length} reservados`}
+              description={`${availableDevices.length} disponíveis, ${reservedDevices.length} reservados e ${pendingDevices.length} pendentes`}
               icon={Smartphone}
               variant="blue"
             />
 
             <SummaryCard
               title="Disponíveis"
-              value={availableDevices.length}
-              description="Aparelhos disponíveis para venda"
+              value={
+                availableDevices.length
+              }
+              description="Aparelhos liberados para venda"
               icon={PackageCheck}
               variant="green"
             />
 
             <SummaryCard
-              title="Aparelhos vendidos"
-              value={soldDevices.length}
-              description={`${saleSummary.total} vendas registradas`}
-              icon={BadgeDollarSign}
+              title="Informações pendentes"
+              value={
+                pendingDevices.length
+              }
+              description="Aparelhos que precisam ser completados"
+              icon={AlertCircle}
               variant="yellow"
             />
 
             <SummaryCard
               title="Valor do estoque"
-              value={formatCurrency(inventoryValue)}
-              description="Valor potencial dos aparelhos não vendidos"
+              value={formatCurrency(
+                inventoryValue,
+              )}
+              description="Considera apenas aparelhos com valor definido"
               icon={CircleDollarSign}
               variant="purple"
             />
@@ -306,7 +382,9 @@ export function Dashboard() {
 
           <section className="dashboard__financial">
             <article className="dashboard__financial-card">
-              <span>Faturamento total</span>
+              <span>
+                Faturamento total
+              </span>
 
               <strong>
                 {formatCurrency(
@@ -315,7 +393,8 @@ export function Dashboard() {
               </strong>
 
               <small>
-                Soma dos valores finais das vendas
+                Soma dos valores finais
+                das vendas
               </small>
             </article>
 
@@ -329,7 +408,8 @@ export function Dashboard() {
               </strong>
 
               <small>
-                Diferença entre vendas e compras
+                Diferença entre vendas e
+                compras
               </small>
             </article>
 
@@ -337,11 +417,29 @@ export function Dashboard() {
               <span>Ticket médio</span>
 
               <strong>
-                {formatCurrency(averageTicket)}
+                {formatCurrency(
+                  averageTicket,
+                )}
               </strong>
 
               <small>
-                Valor médio por venda registrada
+                Valor médio por venda
+                registrada
+              </small>
+            </article>
+
+            <article className="dashboard__financial-card">
+              <span>
+                Aparelhos vendidos
+              </span>
+
+              <strong>
+                {soldDevices.length}
+              </strong>
+
+              <small>
+                {saleSummary.total}{' '}
+                vendas registradas
               </small>
             </article>
           </section>
@@ -349,11 +447,13 @@ export function Dashboard() {
           <section className="dashboard__recent">
             <div className="dashboard__section-header">
               <div>
-                <h2>Últimos dispositivos</h2>
+                <h2>
+                  Últimos dispositivos
+                </h2>
 
                 <p>
-                  Aparelhos adicionados recentemente ao
-                  estoque.
+                  Aparelhos adicionados
+                  recentemente ao estoque.
                 </p>
               </div>
 
@@ -368,8 +468,14 @@ export function Dashboard() {
                   <table className="dashboard__table">
                     <thead>
                       <tr>
-                        <th>Dispositivo</th>
-                        <th>Armazenamento</th>
+                        <th>
+                          Dispositivo
+                        </th>
+
+                        <th>
+                          Armazenamento
+                        </th>
+
                         <th>Entrada</th>
                         <th>Valor</th>
                         <th>Status</th>
@@ -380,23 +486,34 @@ export function Dashboard() {
                     <tbody>
                       {recentDevices.map(
                         (device) => (
-                          <tr key={device.id}>
+                          <tr
+                            key={device.id}
+                          >
                             <td>
                               <div className="dashboard__device">
                                 <div className="dashboard__device-icon">
                                   <Smartphone
-                                    size={20}
+                                    size={
+                                      20
+                                    }
                                   />
                                 </div>
 
                                 <div>
                                   <strong>
-                                    {device.brand}{' '}
-                                    {device.model}
+                                    {
+                                      device.brand
+                                    }{' '}
+                                    {
+                                      device.model
+                                    }
                                   </strong>
 
                                   <span>
-                                    {device.color} ·{' '}
+                                    {getDeviceColor(
+                                      device.color,
+                                    )}{' '}
+                                    ·{' '}
                                     {getConditionLabel(
                                       device.condition,
                                     )}
@@ -406,7 +523,9 @@ export function Dashboard() {
                             </td>
 
                             <td>
-                              {device.storage}
+                              {
+                                device.storage
+                              }
                             </td>
 
                             <td>
@@ -416,7 +535,7 @@ export function Dashboard() {
                             </td>
 
                             <td>
-                              {formatCurrency(
+                              {formatNullableCurrency(
                                 device.salePrice,
                               )}
                             </td>
@@ -463,13 +582,22 @@ export function Dashboard() {
 
                             <div>
                               <strong>
-                                {device.brand}{' '}
-                                {device.model}
+                                {
+                                  device.brand
+                                }{' '}
+                                {
+                                  device.model
+                                }
                               </strong>
 
                               <span>
-                                {device.storage} ·{' '}
-                                {device.color}
+                                {
+                                  device.storage
+                                }{' '}
+                                ·{' '}
+                                {getDeviceColor(
+                                  device.color,
+                                )}
                               </span>
                             </div>
                           </div>
@@ -485,7 +613,9 @@ export function Dashboard() {
 
                         <div className="dashboard__mobile-info">
                           <div>
-                            <span>Entrada</span>
+                            <span>
+                              Entrada
+                            </span>
 
                             <strong>
                               {formatDate(
@@ -495,10 +625,12 @@ export function Dashboard() {
                           </div>
 
                           <div>
-                            <span>Valor</span>
+                            <span>
+                              Valor
+                            </span>
 
                             <strong>
-                              {formatCurrency(
+                              {formatNullableCurrency(
                                 device.salePrice,
                               )}
                             </strong>
@@ -521,12 +653,14 @@ export function Dashboard() {
                 <Smartphone size={31} />
 
                 <h3>
-                  Nenhum dispositivo cadastrado
+                  Nenhum dispositivo
+                  cadastrado
                 </h3>
 
                 <p>
-                  Cadastre o primeiro aparelho para
-                  começar a controlar o estoque.
+                  Cadastre o primeiro
+                  aparelho para começar a
+                  controlar o estoque.
                 </p>
 
                 <Link to="/dispositivos/cadastrar">
@@ -539,11 +673,13 @@ export function Dashboard() {
           <section className="dashboard__recent">
             <div className="dashboard__section-header">
               <div>
-                <h2>Vendas recentes</h2>
+                <h2>
+                  Vendas recentes
+                </h2>
 
                 <p>
-                  Últimas vendas registradas no
-                  sistema.
+                  Últimas vendas
+                  registradas no sistema.
                 </p>
               </div>
 
@@ -554,99 +690,117 @@ export function Dashboard() {
 
             {recentSales.length > 0 ? (
               <div className="dashboard__sales-list">
-                {recentSales.map((sale) => {
-                  const profit =
-                    sale.salePrice -
-                    sale.purchasePrice;
+                {recentSales.map(
+                  (sale) => {
+                    const profit =
+                      sale.salePrice -
+                      sale.purchasePrice;
 
-                  return (
-                    <article
-                      key={sale.id}
-                      className="dashboard__sale-card"
-                    >
-                      <div className="dashboard__sale-main">
-                        <div className="dashboard__sale-icon">
-                          <BadgeDollarSign
-                            size={21}
-                          />
-                        </div>
-
-                        <div>
-                          <strong>
-                            {sale.deviceBrand}{' '}
-                            {sale.deviceModel}
-                          </strong>
-
-                          <span>
-                            Vendido para{' '}
-                            {sale.customerName}
-                          </span>
-                        </div>
-                      </div>
-
-                      <div className="dashboard__sale-data">
-                        <div>
-                          <span>Data</span>
-
-                          <strong>
-                            {formatDate(
-                              sale.soldAt,
-                            )}
-                          </strong>
-                        </div>
-
-                        <div>
-                          <span>Pagamento</span>
-
-                          <strong>
-                            {getPaymentMethodLabel(
-                              sale.paymentMethod,
-                            )}
-                          </strong>
-                        </div>
-
-                        <div>
-                          <span>Valor</span>
-
-                          <strong>
-                            {formatCurrency(
-                              sale.salePrice,
-                            )}
-                          </strong>
-                        </div>
-
-                        <div>
-                          <span>Lucro</span>
-
-                          <strong className="dashboard__sale-profit">
-                            {formatCurrency(
-                              profit,
-                            )}
-                          </strong>
-                        </div>
-                      </div>
-
-                      <Link
-                        to={`/vendas/${sale.id}`}
-                        className="dashboard__sale-details"
+                    return (
+                      <article
+                        key={sale.id}
+                        className="dashboard__sale-card"
                       >
-                        Ver detalhes
-                      </Link>
-                    </article>
-                  );
-                })}
+                        <div className="dashboard__sale-main">
+                          <div className="dashboard__sale-icon">
+                            <BadgeDollarSign
+                              size={21}
+                            />
+                          </div>
+
+                          <div>
+                            <strong>
+                              {
+                                sale.deviceBrand
+                              }{' '}
+                              {
+                                sale.deviceModel
+                              }
+                            </strong>
+
+                            <span>
+                              Vendido para{' '}
+                              {
+                                sale.customerName
+                              }
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="dashboard__sale-data">
+                          <div>
+                            <span>
+                              Data
+                            </span>
+
+                            <strong>
+                              {formatDate(
+                                sale.soldAt,
+                              )}
+                            </strong>
+                          </div>
+
+                          <div>
+                            <span>
+                              Pagamento
+                            </span>
+
+                            <strong>
+                              {getPaymentMethodLabel(
+                                sale.paymentMethod,
+                              )}
+                            </strong>
+                          </div>
+
+                          <div>
+                            <span>
+                              Valor
+                            </span>
+
+                            <strong>
+                              {formatCurrency(
+                                sale.salePrice,
+                              )}
+                            </strong>
+                          </div>
+
+                          <div>
+                            <span>
+                              Lucro
+                            </span>
+
+                            <strong className="dashboard__sale-profit">
+                              {formatCurrency(
+                                profit,
+                              )}
+                            </strong>
+                          </div>
+                        </div>
+
+                        <Link
+                          to={`/vendas/${sale.id}`}
+                          className="dashboard__sale-details"
+                        >
+                          Ver detalhes
+                        </Link>
+                      </article>
+                    );
+                  },
+                )}
               </div>
             ) : (
               <div className="dashboard__empty">
-                <BadgeDollarSign size={31} />
+                <BadgeDollarSign
+                  size={31}
+                />
 
                 <h3>
                   Nenhuma venda registrada
                 </h3>
 
                 <p>
-                  As vendas realizadas aparecerão
-                  nesta área.
+                  As vendas realizadas
+                  aparecerão nesta área.
                 </p>
               </div>
             )}

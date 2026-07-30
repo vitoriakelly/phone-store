@@ -39,13 +39,22 @@ import { formatCurrency } from '../../utils/currency';
 import './styles.scss';
 
 function formatDate(date: string) {
-  return new Intl.DateTimeFormat('pt-BR').format(
+  return new Intl.DateTimeFormat(
+    'pt-BR',
+  ).format(
     new Date(`${date}T12:00:00`),
   );
 }
 
-function getStatusLabel(status: DeviceStatus) {
-  const labels: Record<DeviceStatus, string> = {
+function getStatusLabel(
+  status: DeviceStatus,
+) {
+  const labels: Record<
+    DeviceStatus,
+    string
+  > = {
+    PENDENTE_INFORMACOES:
+      'Pendente de informações',
     DISPONIVEL: 'Disponível',
     RESERVADO: 'Reservado',
     VENDIDO: 'Vendido',
@@ -69,6 +78,16 @@ function getConditionLabel(
   return labels[condition];
 }
 
+function formatNullableCurrency(
+  value: number | null,
+) {
+  if (value === null) {
+    return 'Pendente';
+  }
+
+  return formatCurrency(value);
+}
+
 export function DeviceDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -76,11 +95,18 @@ export function DeviceDetails() {
   const [device, setDevice] =
     useState<Device | null>(null);
 
-  const [selectedStatus, setSelectedStatus] =
-    useState<DeviceStatus>('DISPONIVEL');
+  const [
+    selectedStatus,
+    setSelectedStatus,
+  ] =
+    useState<DeviceStatus>(
+      'DISPONIVEL',
+    );
 
-  const [successMessage, setSuccessMessage] =
-    useState('');
+  const [
+    successMessage,
+    setSuccessMessage,
+  ] = useState('');
 
   const [loadError, setLoadError] =
     useState('');
@@ -105,6 +131,7 @@ export function DeviceDetails() {
           setLoadError(
             'O identificador do dispositivo não foi informado.',
           );
+
           setIsLoading(false);
         }
 
@@ -123,7 +150,10 @@ export function DeviceDetails() {
         }
 
         setDevice(apiDevice);
-        setSelectedStatus(apiDevice.status);
+
+        setSelectedStatus(
+          apiDevice.status,
+        );
       } catch (error) {
         if (!isMounted) {
           return;
@@ -138,7 +168,9 @@ export function DeviceDetails() {
           setLoadError(
             'O aparelho solicitado não existe ou foi excluído.',
           );
-        } else if (error instanceof ApiError) {
+        } else if (
+          error instanceof ApiError
+        ) {
           setLoadError(error.message);
         } else {
           setLoadError(
@@ -164,9 +196,10 @@ export function DeviceDetails() {
       return;
     }
 
-    const timeout = window.setTimeout(() => {
-      setSuccessMessage('');
-    }, 3500);
+    const timeout =
+      window.setTimeout(() => {
+        setSuccessMessage('');
+      }, 3500);
 
     return () => {
       window.clearTimeout(timeout);
@@ -191,6 +224,7 @@ export function DeviceDetails() {
         });
 
       setDevice(updatedDevice);
+
       setSelectedStatus(
         updatedDevice.status,
       );
@@ -216,9 +250,10 @@ export function DeviceDetails() {
       return;
     }
 
-    const shouldDelete = window.confirm(
-      `Deseja realmente excluir ${device.brand} ${device.model}?`,
-    );
+    const shouldDelete =
+      window.confirm(
+        `Deseja realmente excluir ${device.brand} ${device.model}?`,
+      );
 
     if (!shouldDelete) {
       return;
@@ -256,11 +291,13 @@ export function DeviceDetails() {
             <Smartphone size={34} />
           </div>
 
-          <h1>Carregando dispositivo...</h1>
+          <h1>
+            Carregando dispositivo...
+          </h1>
 
           <p>
-            Aguarde enquanto buscamos as informações do
-            aparelho.
+            Aguarde enquanto buscamos as
+            informações do aparelho.
           </p>
         </section>
       </main>
@@ -275,7 +312,9 @@ export function DeviceDetails() {
             <Smartphone size={34} />
           </div>
 
-          <h1>Dispositivo não encontrado</h1>
+          <h1>
+            Dispositivo não encontrado
+          </h1>
 
           <p>
             {loadError ||
@@ -284,6 +323,7 @@ export function DeviceDetails() {
 
           <Link to="/dispositivos">
             <ArrowLeft size={18} />
+
             Voltar para dispositivos
           </Link>
         </section>
@@ -292,7 +332,14 @@ export function DeviceDetails() {
   }
 
   const profit =
-    device.salePrice - device.purchasePrice;
+    device.salePrice === null
+      ? null
+      : device.salePrice -
+        device.purchasePrice;
+
+  const canRegisterSale =
+    device.status === 'DISPONIVEL' ||
+    device.status === 'RESERVADO';
 
   return (
     <main className="device-details">
@@ -303,6 +350,7 @@ export function DeviceDetails() {
             className="device-details__back"
           >
             <ArrowLeft size={18} />
+
             Voltar para dispositivos
           </Link>
 
@@ -313,23 +361,29 @@ export function DeviceDetails() {
 
             <div>
               <h1>
-                {device.brand} {device.model}
+                {device.brand}{' '}
+                {device.model}
               </h1>
 
               <p>
-                {device.storage} · {device.color}
+                {device.storage} ·{' '}
+                {device.color ||
+                  'Cor pendente'}
               </p>
             </div>
           </div>
         </div>
 
         <div className="device-details__heading-actions">
-          {device.status !== 'VENDIDO' && (
+          {canRegisterSale && (
             <Link
               to={`/dispositivos/${device.id}/vender`}
               className="device-details__sell"
             >
-              <BadgeDollarSign size={17} />
+              <BadgeDollarSign
+                size={17}
+              />
+
               Registrar venda
             </Link>
           )}
@@ -339,13 +393,16 @@ export function DeviceDetails() {
             className="device-details__edit"
           >
             <Pencil size={17} />
+
             Editar dispositivo
           </Link>
 
           <span
             className={`device-details__status device-details__status--${device.status.toLowerCase()}`}
           >
-            {getStatusLabel(device.status)}
+            {getStatusLabel(
+              device.status,
+            )}
           </span>
         </div>
       </section>
@@ -363,11 +420,14 @@ export function DeviceDetails() {
         <div className="device-details__main">
           <section className="device-details__section">
             <div className="device-details__section-heading">
-              <h2>Informações do dispositivo</h2>
+              <h2>
+                Informações do dispositivo
+              </h2>
 
               <p>
-                Dados de identificação e características
-                do aparelho.
+                Dados de identificação e
+                características do
+                aparelho.
               </p>
             </div>
 
@@ -377,7 +437,10 @@ export function DeviceDetails() {
 
                 <div>
                   <span>Marca</span>
-                  <strong>{device.brand}</strong>
+
+                  <strong>
+                    {device.brand}
+                  </strong>
                 </div>
               </article>
 
@@ -386,7 +449,10 @@ export function DeviceDetails() {
 
                 <div>
                   <span>Modelo</span>
-                  <strong>{device.model}</strong>
+
+                  <strong>
+                    {device.model}
+                  </strong>
                 </div>
               </article>
 
@@ -394,8 +460,13 @@ export function DeviceDetails() {
                 <HardDrive size={20} />
 
                 <div>
-                  <span>Armazenamento</span>
-                  <strong>{device.storage}</strong>
+                  <span>
+                    Armazenamento
+                  </span>
+
+                  <strong>
+                    {device.storage}
+                  </strong>
                 </div>
               </article>
 
@@ -404,7 +475,11 @@ export function DeviceDetails() {
 
                 <div>
                   <span>Cor</span>
-                  <strong>{device.color}</strong>
+
+                  <strong>
+                    {device.color ||
+                      'Pendente'}
+                  </strong>
                 </div>
               </article>
 
@@ -413,12 +488,18 @@ export function DeviceDetails() {
 
                 <div>
                   <span>IMEI</span>
-                  <strong>{device.imei}</strong>
+
+                  <strong>
+                    {device.imei ||
+                      'Pendente'}
+                  </strong>
                 </div>
               </article>
 
               <article className="device-details__information">
-                <ShieldCheck size={20} />
+                <ShieldCheck
+                  size={20}
+                />
 
                 <div>
                   <span>Condição</span>
@@ -432,13 +513,18 @@ export function DeviceDetails() {
               </article>
 
               <article className="device-details__information">
-                <BatteryCharging size={20} />
+                <BatteryCharging
+                  size={20}
+                />
 
                 <div>
-                  <span>Saúde da bateria</span>
+                  <span>
+                    Saúde da bateria
+                  </span>
 
                   <strong>
-                    {device.batteryHealth != null
+                    {device.batteryHealth !==
+                    null
                       ? `${device.batteryHealth}%`
                       : 'Não informada'}
                   </strong>
@@ -446,13 +532,19 @@ export function DeviceDetails() {
               </article>
 
               <article className="device-details__information">
-                <CalendarDays size={20} />
+                <CalendarDays
+                  size={20}
+                />
 
                 <div>
-                  <span>Data de entrada</span>
+                  <span>
+                    Data de entrada
+                  </span>
 
                   <strong>
-                    {formatDate(device.entryDate)}
+                    {formatDate(
+                      device.entryDate,
+                    )}
                   </strong>
                 </div>
               </article>
@@ -461,16 +553,21 @@ export function DeviceDetails() {
 
           <section className="device-details__section">
             <div className="device-details__section-heading">
-              <h2>Informações comerciais</h2>
+              <h2>
+                Informações comerciais
+              </h2>
 
               <p>
-                Valores de aquisição e venda do aparelho.
+                Valores de aquisição e
+                venda do aparelho.
               </p>
             </div>
 
             <div className="device-details__price-grid">
               <article className="device-details__price-card">
-                <span>Valor de compra</span>
+                <span>
+                  Valor de compra
+                </span>
 
                 <strong>
                   {formatCurrency(
@@ -480,26 +577,36 @@ export function DeviceDetails() {
               </article>
 
               <article className="device-details__price-card">
-                <span>Valor de venda</span>
+                <span>
+                  Valor de venda
+                </span>
 
                 <strong>
-                  {formatCurrency(
+                  {formatNullableCurrency(
                     device.salePrice,
                   )}
                 </strong>
               </article>
 
               <article className="device-details__price-card">
-                <span>Lucro estimado</span>
+                <span>
+                  Lucro estimado
+                </span>
 
                 <strong>
-                  {formatCurrency(profit)}
+                  {profit === null
+                    ? 'Pendente'
+                    : formatCurrency(
+                        profit,
+                      )}
                 </strong>
               </article>
             </div>
 
             <div className="device-details__supplier">
-              <CircleDollarSign size={20} />
+              <CircleDollarSign
+                size={20}
+              />
 
               <div>
                 <span>Fornecedor</span>
@@ -517,8 +624,8 @@ export function DeviceDetails() {
               <h2>Observações</h2>
 
               <p>
-                Informações adicionais registradas no
-                cadastro.
+                Informações adicionais
+                registradas no cadastro.
               </p>
             </div>
 
@@ -534,7 +641,8 @@ export function DeviceDetails() {
             <h2>Alterar status</h2>
 
             <p>
-              Atualize a situação atual do aparelho.
+              Atualize a situação atual
+              do aparelho.
             </p>
 
             <label htmlFor="deviceStatus">
@@ -550,8 +658,14 @@ export function DeviceDetails() {
                     .value as DeviceStatus,
                 )
               }
-              disabled={isUpdatingStatus}
+              disabled={
+                isUpdatingStatus
+              }
             >
+              <option value="PENDENTE_INFORMACOES">
+                Pendente de informações
+              </option>
+
               <option value="DISPONIVEL">
                 Disponível
               </option>
@@ -572,7 +686,8 @@ export function DeviceDetails() {
               }
               disabled={
                 isUpdatingStatus ||
-                selectedStatus === device.status
+                selectedStatus ===
+                  device.status
               }
             >
               <Save size={18} />
@@ -584,11 +699,13 @@ export function DeviceDetails() {
           </section>
 
           <section className="device-details__danger-card">
-            <h2>Excluir dispositivo</h2>
+            <h2>
+              Excluir dispositivo
+            </h2>
 
             <p>
-              Esta ação removerá o cadastro
-              permanentemente.
+              Esta ação removerá o
+              cadastro permanentemente.
             </p>
 
             <button

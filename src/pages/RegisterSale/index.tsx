@@ -2,13 +2,19 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import {
   ArrowLeft,
   BadgeDollarSign,
+  MapPin,
+  Repeat2,
   Smartphone,
+  UserRound,
 } from 'lucide-react';
 import {
   useEffect,
   useState,
 } from 'react';
-import { useForm } from 'react-hook-form';
+import {
+  type FieldPath,
+  useForm,
+} from 'react-hook-form';
 import {
   Link,
   useNavigate,
@@ -23,6 +29,7 @@ import { ApiError } from '../../services/api';
 import { getDeviceById } from '../../services/deviceApi';
 import { createSale } from '../../services/saleApi';
 import type { Device } from '../../types/device';
+import type { TradeInDeviceInput } from '../../types/sale';
 import { formatCurrency } from '../../utils/currency';
 
 import './styles.scss';
@@ -31,13 +38,81 @@ function getCurrentDate() {
   const currentDate = new Date();
 
   const timezoneOffset =
-    currentDate.getTimezoneOffset() * 60_000;
+    currentDate.getTimezoneOffset() *
+    60_000;
 
   return new Date(
-    currentDate.getTime() - timezoneOffset,
+    currentDate.getTime() -
+      timezoneOffset,
   )
     .toISOString()
     .split('T')[0];
+}
+
+function buildTradeInDevice(
+  data: SaleFormData,
+): TradeInDeviceInput | undefined {
+  if (
+    data.paymentMethod !==
+    'TROCA_DISPOSITIVO'
+  ) {
+    return undefined;
+  }
+
+  const tradeInDevice =
+    data.tradeInDevice;
+
+  if (
+    !tradeInDevice?.brand ||
+    !tradeInDevice.model ||
+    !tradeInDevice.storage ||
+    tradeInDevice.batteryHealth ===
+      undefined ||
+    !tradeInDevice.condition ||
+    tradeInDevice.purchasePrice ===
+      undefined ||
+    !tradeInDevice.entryDate
+  ) {
+    return undefined;
+  }
+
+  return {
+    brand:
+      tradeInDevice.brand.trim(),
+
+    model:
+      tradeInDevice.model.trim(),
+
+    storage:
+      tradeInDevice.storage.trim(),
+
+    color:
+      tradeInDevice.color?.trim() ||
+      undefined,
+
+    imei:
+      tradeInDevice.imei?.trim() ||
+      undefined,
+
+    batteryHealth:
+      tradeInDevice.batteryHealth,
+
+    condition:
+      tradeInDevice.condition,
+
+    purchasePrice:
+      tradeInDevice.purchasePrice,
+
+    salePrice:
+      tradeInDevice.salePrice,
+
+    entryDate:
+      tradeInDevice.entryDate,
+
+    notes:
+      tradeInDevice.notes?.trim() ||
+      undefined,
+  };
 }
 
 export function RegisterSale() {
@@ -63,7 +138,9 @@ export function RegisterSale() {
     register,
     reset,
     setError,
+    watch,
     handleSubmit,
+
     formState: {
       errors,
       isSubmitting,
@@ -74,12 +151,41 @@ export function RegisterSale() {
     defaultValues: {
       customerName: '',
       customerPhone: '',
+
+      customerZipCode: '',
+      customerStreet: '',
+      customerNeighborhood: '',
+      customerCity: '',
+      customerAddressNumber: '',
+      customerSocialNetwork: '',
+
       salePrice: undefined,
       paymentMethod: 'PIX',
       soldAt: getCurrentDate(),
       notes: '',
+
+      tradeInDevice: {
+        brand: '',
+        model: '',
+        storage: '',
+        color: '',
+        imei: '',
+        batteryHealth: undefined,
+        condition: 'SEMINOVO',
+        purchasePrice: undefined,
+        salePrice: undefined,
+        entryDate: getCurrentDate(),
+        notes: '',
+      },
     },
   });
+
+  const paymentMethod =
+    watch('paymentMethod');
+
+  const isTradeIn =
+    paymentMethod ===
+    'TROCA_DISPOSITIVO';
 
   useEffect(() => {
     let isMounted = true;
@@ -116,10 +222,45 @@ export function RegisterSale() {
         reset({
           customerName: '',
           customerPhone: '',
-          salePrice: apiDevice.salePrice,
+
+          customerZipCode: '',
+          customerStreet: '',
+          customerNeighborhood: '',
+          customerCity: '',
+          customerAddressNumber: '',
+          customerSocialNetwork: '',
+
+          salePrice:
+            apiDevice.salePrice ??
+            undefined,
+
           paymentMethod: 'PIX',
           soldAt: getCurrentDate(),
           notes: '',
+
+          tradeInDevice: {
+            brand: '',
+            model: '',
+            storage: '',
+            color: '',
+            imei: '',
+
+            batteryHealth:
+              undefined,
+
+            condition: 'SEMINOVO',
+
+            purchasePrice:
+              undefined,
+
+            salePrice:
+              undefined,
+
+            entryDate:
+              getCurrentDate(),
+
+            notes: '',
+          },
         });
       } catch (error) {
         if (!isMounted) {
@@ -141,8 +282,12 @@ export function RegisterSale() {
           return;
         }
 
-        if (error instanceof ApiError) {
-          setLoadError(error.message);
+        if (
+          error instanceof ApiError
+        ) {
+          setLoadError(
+            error.message,
+          );
         } else {
           setLoadError(
             'Não foi possível carregar o dispositivo. Verifique se a API está funcionando.',
@@ -171,52 +316,130 @@ export function RegisterSale() {
 
     setSubmitError('');
 
+    const tradeInDevice =
+      buildTradeInDevice(data);
+
+    if (
+      data.paymentMethod ===
+        'TROCA_DISPOSITIVO' &&
+      !tradeInDevice
+    ) {
+      setSubmitError(
+        'Preencha os dados obrigatórios do dispositivo recebido na troca.',
+      );
+
+      return;
+    }
+
     try {
       await createSale({
         deviceId: device.id,
-        customerName: data.customerName,
+
+        customerName:
+          data.customerName.trim(),
+
         customerPhone:
-          data.customerPhone || undefined,
+          data.customerPhone?.trim() ||
+          undefined,
+
+        customerZipCode:
+          data.customerZipCode.trim(),
+
+        customerStreet:
+          data.customerStreet.trim(),
+
+        customerNeighborhood:
+          data.customerNeighborhood.trim(),
+
+        customerCity:
+          data.customerCity.trim(),
+
+        customerAddressNumber:
+          data.customerAddressNumber.trim(),
+
+        customerSocialNetwork:
+          data.customerSocialNetwork.trim(),
+
         salePrice: data.salePrice,
-        paymentMethod: data.paymentMethod,
+
+        paymentMethod:
+          data.paymentMethod,
+
         soldAt: data.soldAt,
-        notes: data.notes || undefined,
+
+        notes:
+          data.notes?.trim() ||
+          undefined,
+
+        tradeInDevice,
       });
 
       navigate('/dispositivos', {
         state: {
           successMessage:
-            'Venda registrada com sucesso.',
+            data.paymentMethod ===
+            'TROCA_DISPOSITIVO'
+              ? 'Venda registrada e dispositivo recebido adicionado ao estoque.'
+              : 'Venda registrada com sucesso.',
         },
       });
     } catch (error) {
-      if (error instanceof ApiError) {
+      if (
+        error instanceof ApiError
+      ) {
         const formFields: Array<
-          keyof SaleFormData
+          FieldPath<SaleFormData>
         > = [
           'customerName',
           'customerPhone',
+          'customerZipCode',
+          'customerStreet',
+          'customerNeighborhood',
+          'customerCity',
+          'customerAddressNumber',
+          'customerSocialNetwork',
           'salePrice',
           'paymentMethod',
           'soldAt',
           'notes',
+
+          'tradeInDevice.brand',
+          'tradeInDevice.model',
+          'tradeInDevice.storage',
+          'tradeInDevice.color',
+          'tradeInDevice.imei',
+          'tradeInDevice.batteryHealth',
+          'tradeInDevice.condition',
+          'tradeInDevice.purchasePrice',
+          'tradeInDevice.salePrice',
+          'tradeInDevice.entryDate',
+          'tradeInDevice.notes',
         ];
+
+        let hasFieldError = false;
 
         for (const field of formFields) {
           const fieldMessage =
             error.errors?.[field]?.[0];
 
-          if (fieldMessage) {
-            setError(field, {
-              type: 'server',
-              message: fieldMessage,
-            });
-
-            return;
+          if (!fieldMessage) {
+            continue;
           }
+
+          hasFieldError = true;
+
+          setError(field, {
+            type: 'server',
+            message: fieldMessage,
+          });
         }
 
-        setSubmitError(error.message);
+        if (!hasFieldError) {
+          setSubmitError(
+            error.message,
+          );
+        }
+
         return;
       }
 
@@ -237,11 +460,13 @@ export function RegisterSale() {
         <section className="register-sale__not-found">
           <Smartphone size={36} />
 
-          <h1>Carregando dispositivo...</h1>
+          <h1>
+            Carregando dispositivo...
+          </h1>
 
           <p>
-            Aguarde enquanto buscamos os dados do
-            aparelho.
+            Aguarde enquanto buscamos os
+            dados do aparelho.
           </p>
         </section>
       </main>
@@ -267,6 +492,7 @@ export function RegisterSale() {
 
           <Link to="/dispositivos">
             <ArrowLeft size={18} />
+
             Voltar para dispositivos
           </Link>
         </section>
@@ -280,17 +506,86 @@ export function RegisterSale() {
         <section className="register-sale__not-found">
           <BadgeDollarSign size={36} />
 
-          <h1>Dispositivo já vendido</h1>
+          <h1>
+            Dispositivo já vendido
+          </h1>
 
           <p>
-            Este aparelho já possui uma venda
-            registrada.
+            Este aparelho já possui uma
+            venda registrada.
           </p>
 
           <Link
             to={`/dispositivos/${device.id}`}
           >
             <ArrowLeft size={18} />
+
+            Voltar para os detalhes
+          </Link>
+        </section>
+      </main>
+    );
+  }
+
+  if (
+    device.status ===
+      'PENDENTE_INFORMACOES' ||
+    !device.imei ||
+    !device.color ||
+    device.salePrice === null
+  ) {
+    return (
+      <main className="register-sale">
+        <section className="register-sale__not-found">
+          <Smartphone size={36} />
+
+          <h1>
+            Dispositivo com informações
+            pendentes
+          </h1>
+
+          <p>
+            Preencha a cor, o IMEI e o
+            valor de venda antes de
+            registrar a venda deste
+            aparelho.
+          </p>
+
+          <Link
+            to={`/dispositivos/${device.id}/editar`}
+          >
+            <ArrowLeft size={18} />
+
+            Completar cadastro
+          </Link>
+        </section>
+      </main>
+    );
+  }
+
+  if (
+    device.status !== 'DISPONIVEL' &&
+    device.status !== 'RESERVADO'
+  ) {
+    return (
+      <main className="register-sale">
+        <section className="register-sale__not-found">
+          <BadgeDollarSign size={36} />
+
+          <h1>
+            Dispositivo indisponível
+          </h1>
+
+          <p>
+            Este aparelho não está
+            disponível para venda.
+          </p>
+
+          <Link
+            to={`/dispositivos/${device.id}`}
+          >
+            <ArrowLeft size={18} />
+
             Voltar para os detalhes
           </Link>
         </section>
@@ -307,13 +602,15 @@ export function RegisterSale() {
             className="register-sale__back"
           >
             <ArrowLeft size={18} />
+
             Voltar para os detalhes
           </Link>
 
           <h1>Registrar venda</h1>
 
           <p>
-            Informe os dados da venda e do cliente.
+            Informe os dados da venda,
+            do comprador e da negociação.
           </p>
         </div>
 
@@ -328,14 +625,18 @@ export function RegisterSale() {
         </div>
 
         <div>
-          <span>Dispositivo selecionado</span>
+          <span>
+            Dispositivo selecionado
+          </span>
 
           <strong>
-            {device.brand} {device.model}
+            {device.brand}{' '}
+            {device.model}
           </strong>
 
           <p>
-            {device.storage} · {device.color} · IMEI{' '}
+            {device.storage} ·{' '}
+            {device.color} · IMEI{' '}
             {device.imei}
           </p>
         </div>
@@ -344,7 +645,9 @@ export function RegisterSale() {
           <span>Valor anunciado</span>
 
           <strong>
-            {formatCurrency(device.salePrice)}
+            {formatCurrency(
+              device.salePrice,
+            )}
           </strong>
         </div>
       </section>
@@ -358,30 +661,42 @@ export function RegisterSale() {
       >
         <section className="register-sale__section">
           <div className="register-sale__section-heading">
-            <h2>Dados do cliente</h2>
+            <UserRound size={22} />
 
-            <p>
-              Identificação da pessoa que comprou o
-              aparelho.
-            </p>
+            <div>
+              <h2>
+                Dados do comprador
+              </h2>
+
+              <p>
+                Identificação e contato
+                da pessoa que comprou o
+                aparelho.
+              </p>
+            </div>
           </div>
 
           <div className="register-sale__grid">
             <div className="register-sale__field">
               <label htmlFor="customerName">
-                Nome do cliente *
+                Nome do comprador *
               </label>
 
               <input
                 id="customerName"
                 type="text"
                 placeholder="Nome completo"
-                {...register('customerName')}
+                {...register(
+                  'customerName',
+                )}
               />
 
               {errors.customerName && (
                 <span className="register-sale__error">
-                  {errors.customerName.message}
+                  {
+                    errors.customerName
+                      .message
+                  }
                 </span>
               )}
             </div>
@@ -395,12 +710,42 @@ export function RegisterSale() {
                 id="customerPhone"
                 type="tel"
                 placeholder="(88) 99999-9999"
-                {...register('customerPhone')}
+                {...register(
+                  'customerPhone',
+                )}
               />
 
               {errors.customerPhone && (
                 <span className="register-sale__error">
-                  {errors.customerPhone.message}
+                  {
+                    errors.customerPhone
+                      .message
+                  }
+                </span>
+              )}
+            </div>
+
+            <div className="register-sale__field">
+              <label htmlFor="customerSocialNetwork">
+                Rede social *
+              </label>
+
+              <input
+                id="customerSocialNetwork"
+                type="text"
+                placeholder="@usuario ou link do perfil"
+                {...register(
+                  'customerSocialNetwork',
+                )}
+              />
+
+              {errors.customerSocialNetwork && (
+                <span className="register-sale__error">
+                  {
+                    errors
+                      .customerSocialNetwork
+                      .message
+                  }
                 </span>
               )}
             </div>
@@ -409,12 +754,181 @@ export function RegisterSale() {
 
         <section className="register-sale__section">
           <div className="register-sale__section-heading">
-            <h2>Informações da venda</h2>
+            <MapPin size={22} />
 
-            <p>
-              Valor, forma de pagamento e data da
-              negociação.
-            </p>
+            <div>
+              <h2>
+                Endereço do comprador
+              </h2>
+
+              <p>
+                Endereço informado no
+                momento da venda.
+              </p>
+            </div>
+          </div>
+
+          <div className="register-sale__grid">
+            <div className="register-sale__field">
+              <label htmlFor="customerZipCode">
+                CEP *
+              </label>
+
+              <input
+                id="customerZipCode"
+                type="text"
+                inputMode="numeric"
+                maxLength={9}
+                placeholder="00000-000"
+                {...register(
+                  'customerZipCode',
+                  {
+                    onChange: (
+                      event,
+                    ) => {
+                      const digits =
+                        event.target.value
+                          .replace(
+                            /\D/g,
+                            '',
+                          )
+                          .slice(0, 8);
+
+                      event.target.value =
+                        digits.replace(
+                          /^(\d{5})(\d)/,
+                          '$1-$2',
+                        );
+                    },
+                  },
+                )}
+              />
+
+              {errors.customerZipCode && (
+                <span className="register-sale__error">
+                  {
+                    errors
+                      .customerZipCode
+                      .message
+                  }
+                </span>
+              )}
+            </div>
+
+            <div className="register-sale__field">
+              <label htmlFor="customerStreet">
+                Rua *
+              </label>
+
+              <input
+                id="customerStreet"
+                type="text"
+                placeholder="Nome da rua"
+                {...register(
+                  'customerStreet',
+                )}
+              />
+
+              {errors.customerStreet && (
+                <span className="register-sale__error">
+                  {
+                    errors.customerStreet
+                      .message
+                  }
+                </span>
+              )}
+            </div>
+
+            <div className="register-sale__field">
+              <label htmlFor="customerAddressNumber">
+                Número *
+              </label>
+
+              <input
+                id="customerAddressNumber"
+                type="text"
+                placeholder="Ex.: 125 ou S/N"
+                {...register(
+                  'customerAddressNumber',
+                )}
+              />
+
+              {errors.customerAddressNumber && (
+                <span className="register-sale__error">
+                  {
+                    errors
+                      .customerAddressNumber
+                      .message
+                  }
+                </span>
+              )}
+            </div>
+
+            <div className="register-sale__field">
+              <label htmlFor="customerNeighborhood">
+                Bairro *
+              </label>
+
+              <input
+                id="customerNeighborhood"
+                type="text"
+                placeholder="Bairro"
+                {...register(
+                  'customerNeighborhood',
+                )}
+              />
+
+              {errors.customerNeighborhood && (
+                <span className="register-sale__error">
+                  {
+                    errors
+                      .customerNeighborhood
+                      .message
+                  }
+                </span>
+              )}
+            </div>
+
+            <div className="register-sale__field">
+              <label htmlFor="customerCity">
+                Cidade *
+              </label>
+
+              <input
+                id="customerCity"
+                type="text"
+                placeholder="Cidade"
+                {...register(
+                  'customerCity',
+                )}
+              />
+
+              {errors.customerCity && (
+                <span className="register-sale__error">
+                  {
+                    errors.customerCity
+                      .message
+                  }
+                </span>
+              )}
+            </div>
+          </div>
+        </section>
+
+        <section className="register-sale__section">
+          <div className="register-sale__section-heading">
+            <BadgeDollarSign size={22} />
+
+            <div>
+              <h2>
+                Informações da venda
+              </h2>
+
+              <p>
+                Valor, forma de pagamento
+                e data da negociação.
+              </p>
+            </div>
           </div>
 
           <div className="register-sale__grid">
@@ -431,15 +945,28 @@ export function RegisterSale() {
                   type="number"
                   min="0"
                   step="0.01"
-                  {...register('salePrice', {
-                    valueAsNumber: true,
-                  })}
+                  {...register(
+                    'salePrice',
+                    {
+                      setValueAs: (
+                        value,
+                      ) =>
+                        value === ''
+                          ? undefined
+                          : Number(
+                              value,
+                            ),
+                    },
+                  )}
                 />
               </div>
 
               {errors.salePrice && (
                 <span className="register-sale__error">
-                  {errors.salePrice.message}
+                  {
+                    errors.salePrice
+                      .message
+                  }
                 </span>
               )}
             </div>
@@ -451,7 +978,9 @@ export function RegisterSale() {
 
               <select
                 id="paymentMethod"
-                {...register('paymentMethod')}
+                {...register(
+                  'paymentMethod',
+                )}
               >
                 <option value="PIX">
                   Pix
@@ -473,6 +1002,10 @@ export function RegisterSale() {
                   Transferência
                 </option>
 
+                <option value="TROCA_DISPOSITIVO">
+                  Troca de dispositivo
+                </option>
+
                 <option value="OUTRO">
                   Outro
                 </option>
@@ -480,7 +1013,10 @@ export function RegisterSale() {
 
               {errors.paymentMethod && (
                 <span className="register-sale__error">
-                  {errors.paymentMethod.message}
+                  {
+                    errors.paymentMethod
+                      .message
+                  }
                 </span>
               )}
             </div>
@@ -505,12 +1041,418 @@ export function RegisterSale() {
           </div>
         </section>
 
+        {isTradeIn && (
+          <section className="register-sale__section">
+            <div className="register-sale__section-heading">
+              <Repeat2 size={22} />
+
+              <div>
+                <h2>
+                  Dispositivo recebido na
+                  troca
+                </h2>
+
+                <p>
+                  O aparelho será adicionado
+                  ao estoque com status
+                  pendente de informações.
+                </p>
+              </div>
+            </div>
+
+            <div className="register-sale__grid">
+              <div className="register-sale__field">
+                <label htmlFor="tradeInBrand">
+                  Marca *
+                </label>
+
+                <input
+                  id="tradeInBrand"
+                  type="text"
+                  placeholder="Ex.: Apple"
+                  {...register(
+                    'tradeInDevice.brand',
+                  )}
+                />
+
+                {errors.tradeInDevice
+                  ?.brand && (
+                  <span className="register-sale__error">
+                    {
+                      errors
+                        .tradeInDevice
+                        .brand.message
+                    }
+                  </span>
+                )}
+              </div>
+
+              <div className="register-sale__field">
+                <label htmlFor="tradeInModel">
+                  Modelo *
+                </label>
+
+                <input
+                  id="tradeInModel"
+                  type="text"
+                  placeholder="Ex.: iPhone 12"
+                  {...register(
+                    'tradeInDevice.model',
+                  )}
+                />
+
+                {errors.tradeInDevice
+                  ?.model && (
+                  <span className="register-sale__error">
+                    {
+                      errors
+                        .tradeInDevice
+                        .model.message
+                    }
+                  </span>
+                )}
+              </div>
+
+              <div className="register-sale__field">
+                <label htmlFor="tradeInStorage">
+                  Armazenamento *
+                </label>
+
+                <select
+                  id="tradeInStorage"
+                  {...register(
+                    'tradeInDevice.storage',
+                  )}
+                >
+                  <option value="">
+                    Selecione
+                  </option>
+
+                  <option value="32 GB">
+                    32 GB
+                  </option>
+
+                  <option value="64 GB">
+                    64 GB
+                  </option>
+
+                  <option value="128 GB">
+                    128 GB
+                  </option>
+
+                  <option value="256 GB">
+                    256 GB
+                  </option>
+
+                  <option value="512 GB">
+                    512 GB
+                  </option>
+
+                  <option value="1 TB">
+                    1 TB
+                  </option>
+                </select>
+
+                {errors.tradeInDevice
+                  ?.storage && (
+                  <span className="register-sale__error">
+                    {
+                      errors
+                        .tradeInDevice
+                        .storage.message
+                    }
+                  </span>
+                )}
+              </div>
+
+              <div className="register-sale__field">
+                <label htmlFor="tradeInColor">
+                  Cor
+                </label>
+
+                <input
+                  id="tradeInColor"
+                  type="text"
+                  placeholder="Pode ser informada depois"
+                  {...register(
+                    'tradeInDevice.color',
+                  )}
+                />
+
+                {errors.tradeInDevice
+                  ?.color && (
+                  <span className="register-sale__error">
+                    {
+                      errors
+                        .tradeInDevice
+                        .color.message
+                    }
+                  </span>
+                )}
+              </div>
+
+              <div className="register-sale__field">
+                <label htmlFor="tradeInImei">
+                  IMEI
+                </label>
+
+                <input
+                  id="tradeInImei"
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={15}
+                  placeholder="Pode ser informado depois"
+                  {...register(
+                    'tradeInDevice.imei',
+                    {
+                      onChange: (
+                        event,
+                      ) => {
+                        event.target.value =
+                          event.target.value.replace(
+                            /\D/g,
+                            '',
+                          );
+                      },
+                    },
+                  )}
+                />
+
+                {errors.tradeInDevice
+                  ?.imei && (
+                  <span className="register-sale__error">
+                    {
+                      errors
+                        .tradeInDevice
+                        .imei.message
+                    }
+                  </span>
+                )}
+              </div>
+
+              <div className="register-sale__field">
+                <label htmlFor="tradeInBatteryHealth">
+                  Saúde da bateria *
+                </label>
+
+                <div className="register-sale__input-prefix">
+                  <input
+                    id="tradeInBatteryHealth"
+                    type="number"
+                    min="0"
+                    max="100"
+                    placeholder="Ex.: 87"
+                    {...register(
+                      'tradeInDevice.batteryHealth',
+                      {
+                        setValueAs: (
+                          value,
+                        ) =>
+                          value === ''
+                            ? undefined
+                            : Number(
+                                value,
+                              ),
+                      },
+                    )}
+                  />
+
+                  <span>%</span>
+                </div>
+
+                {errors.tradeInDevice
+                  ?.batteryHealth && (
+                  <span className="register-sale__error">
+                    {
+                      errors
+                        .tradeInDevice
+                        .batteryHealth
+                        .message
+                    }
+                  </span>
+                )}
+              </div>
+
+              <div className="register-sale__field">
+                <label htmlFor="tradeInCondition">
+                  Condição *
+                </label>
+
+                <select
+                  id="tradeInCondition"
+                  {...register(
+                    'tradeInDevice.condition',
+                  )}
+                >
+                  <option value="NOVO">
+                    Novo
+                  </option>
+
+                  <option value="SEMINOVO">
+                    Seminovo
+                  </option>
+
+                  <option value="USADO">
+                    Usado
+                  </option>
+                </select>
+
+                {errors.tradeInDevice
+                  ?.condition && (
+                  <span className="register-sale__error">
+                    {
+                      errors
+                        .tradeInDevice
+                        .condition.message
+                    }
+                  </span>
+                )}
+              </div>
+
+              <div className="register-sale__field">
+                <label htmlFor="tradeInPurchasePrice">
+                  Valor de compra *
+                </label>
+
+                <div className="register-sale__input-prefix">
+                  <span>R$</span>
+
+                  <input
+                    id="tradeInPurchasePrice"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    {...register(
+                      'tradeInDevice.purchasePrice',
+                      {
+                        setValueAs: (
+                          value,
+                        ) =>
+                          value === ''
+                            ? undefined
+                            : Number(
+                                value,
+                              ),
+                      },
+                    )}
+                  />
+                </div>
+
+                {errors.tradeInDevice
+                  ?.purchasePrice && (
+                  <span className="register-sale__error">
+                    {
+                      errors
+                        .tradeInDevice
+                        .purchasePrice
+                        .message
+                    }
+                  </span>
+                )}
+              </div>
+
+              <div className="register-sale__field">
+                <label htmlFor="tradeInEntryDate">
+                  Data de entrada *
+                </label>
+
+                <input
+                  id="tradeInEntryDate"
+                  type="date"
+                  {...register(
+                    'tradeInDevice.entryDate',
+                  )}
+                />
+
+                {errors.tradeInDevice
+                  ?.entryDate && (
+                  <span className="register-sale__error">
+                    {
+                      errors
+                        .tradeInDevice
+                        .entryDate.message
+                    }
+                  </span>
+                )}
+              </div>
+
+              <div className="register-sale__field">
+                <label htmlFor="tradeInSalePrice">
+                  Valor de venda
+                </label>
+
+                <div className="register-sale__input-prefix">
+                  <span>R$</span>
+
+                  <input
+                    id="tradeInSalePrice"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    placeholder="Pode ser definido depois"
+                    {...register(
+                      'tradeInDevice.salePrice',
+                      {
+                        setValueAs: (
+                          value,
+                        ) =>
+                          value === ''
+                            ? undefined
+                            : Number(
+                                value,
+                              ),
+                      },
+                    )}
+                  />
+                </div>
+
+                {errors.tradeInDevice
+                  ?.salePrice && (
+                  <span className="register-sale__error">
+                    {
+                      errors
+                        .tradeInDevice
+                        .salePrice.message
+                    }
+                  </span>
+                )}
+              </div>
+            </div>
+
+            <div className="register-sale__field">
+              <label htmlFor="tradeInNotes">
+                Observações do dispositivo
+              </label>
+
+              <textarea
+                id="tradeInNotes"
+                rows={4}
+                placeholder="Informações sobre estado, defeitos ou acessórios."
+                {...register(
+                  'tradeInDevice.notes',
+                )}
+              />
+
+              {errors.tradeInDevice
+                ?.notes && (
+                <span className="register-sale__error">
+                  {
+                    errors.tradeInDevice
+                      .notes.message
+                  }
+                </span>
+              )}
+            </div>
+          </section>
+        )}
+
         <section className="register-sale__section">
           <div className="register-sale__section-heading">
-            <h2>Observações</h2>
+            <h2>Observações da venda</h2>
 
             <p>
-              Informações adicionais sobre a venda.
+              Informações adicionais sobre
+              a negociação.
             </p>
           </div>
 

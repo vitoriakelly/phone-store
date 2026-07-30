@@ -29,14 +29,23 @@ import { formatCurrency } from '../../utils/currency';
 
 import './styles.scss';
 
-type StatusFilter = 'TODOS' | DeviceStatus;
+type StatusFilter =
+  | 'TODOS'
+  | DeviceStatus;
 
 interface LocationState {
   successMessage?: string;
 }
 
-function getStatusLabel(status: DeviceStatus) {
-  const labels: Record<DeviceStatus, string> = {
+function getStatusLabel(
+  status: DeviceStatus,
+) {
+  const labels: Record<
+    DeviceStatus,
+    string
+  > = {
+    PENDENTE_INFORMACOES:
+      'Pendente de informações',
     DISPONIVEL: 'Disponível',
     RESERVADO: 'Reservado',
     VENDIDO: 'Vendido',
@@ -46,9 +55,28 @@ function getStatusLabel(status: DeviceStatus) {
 }
 
 function formatDate(date: string) {
-  return new Intl.DateTimeFormat('pt-BR').format(
+  return new Intl.DateTimeFormat(
+    'pt-BR',
+  ).format(
     new Date(`${date}T12:00:00`),
   );
+}
+
+function formatNullableCurrency(
+  value: number | null,
+) {
+  if (value === null) {
+    return 'Pendente';
+  }
+
+  return formatCurrency(value);
+}
+
+function getOptionalValue(
+  value: string | null,
+  fallback = 'Pendente',
+) {
+  return value || fallback;
 }
 
 export function Devices() {
@@ -58,15 +86,27 @@ export function Devices() {
   const locationState =
     location.state as LocationState | null;
 
-  const [devices, setDevices] = useState<Device[]>([]);
-  const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] =
-    useState<StatusFilter>('TODOS');
+  const [devices, setDevices] =
+    useState<Device[]>([]);
 
-  const [successMessage, setSuccessMessage] =
-    useState(
-      locationState?.successMessage ?? '',
+  const [search, setSearch] =
+    useState('');
+
+  const [
+    statusFilter,
+    setStatusFilter,
+  ] =
+    useState<StatusFilter>(
+      'TODOS',
     );
+
+  const [
+    successMessage,
+    setSuccessMessage,
+  ] = useState(
+    locationState?.successMessage ??
+      '',
+  );
 
   const [isLoading, setIsLoading] =
     useState(true);
@@ -74,7 +114,10 @@ export function Devices() {
   const [loadError, setLoadError] =
     useState('');
 
-  const [deletingDeviceId, setDeletingDeviceId] =
+  const [
+    deletingDeviceId,
+    setDeletingDeviceId,
+  ] =
     useState<string | null>(null);
 
   useEffect(() => {
@@ -127,9 +170,10 @@ export function Devices() {
       state: null,
     });
 
-    const timeout = window.setTimeout(() => {
-      setSuccessMessage('');
-    }, 4000);
+    const timeout =
+      window.setTimeout(() => {
+        setSuccessMessage('');
+      }, 4000);
 
     return () => {
       window.clearTimeout(timeout);
@@ -140,68 +184,80 @@ export function Devices() {
     successMessage,
   ]);
 
-  const filteredDevices = useMemo(() => {
-    const normalizedSearch = search
-      .trim()
-      .toLowerCase();
-
-    return [...devices]
-      .filter((device) => {
-        const matchesStatus =
-          statusFilter === 'TODOS' ||
-          device.status === statusFilter;
-
-        const searchableContent = [
-          device.brand,
-          device.model,
-          device.imei,
-          device.color,
-          device.storage,
-        ]
-          .join(' ')
+  const filteredDevices =
+    useMemo(() => {
+      const normalizedSearch =
+        search
+          .trim()
           .toLowerCase();
 
-        const matchesSearch =
-          normalizedSearch === '' ||
-          searchableContent.includes(
-            normalizedSearch,
+      return [...devices]
+        .filter((device) => {
+          const matchesStatus =
+            statusFilter ===
+              'TODOS' ||
+            device.status ===
+              statusFilter;
+
+          const searchableContent =
+            [
+              device.brand,
+              device.model,
+              device.imei ?? '',
+              device.color ?? '',
+              device.storage,
+              device.supplier ?? '',
+            ]
+              .join(' ')
+              .toLowerCase();
+
+          const matchesSearch =
+            normalizedSearch === '' ||
+            searchableContent.includes(
+              normalizedSearch,
+            );
+
+          return (
+            matchesStatus &&
+            matchesSearch
           );
+        })
+        .sort(
+          (
+            firstDevice,
+            secondDevice,
+          ) => {
+            const firstDate =
+              new Date(
+                firstDevice.createdAt ||
+                  firstDevice.entryDate,
+              ).getTime();
 
-        return (
-          matchesStatus &&
-          matchesSearch
+            const secondDate =
+              new Date(
+                secondDevice.createdAt ||
+                  secondDevice.entryDate,
+              ).getTime();
+
+            return (
+              secondDate -
+              firstDate
+            );
+          },
         );
-      })
-      .sort(
-        (
-          firstDevice,
-          secondDevice,
-        ) => {
-          const firstDate = new Date(
-            firstDevice.createdAt ||
-              firstDevice.entryDate,
-          ).getTime();
-
-          const secondDate = new Date(
-            secondDevice.createdAt ||
-              secondDevice.entryDate,
-          ).getTime();
-
-          return secondDate - firstDate;
-        },
-      );
-  }, [
-    devices,
-    search,
-    statusFilter,
-  ]);
+    }, [
+      devices,
+      search,
+      statusFilter,
+    ]);
 
   async function handleDeleteDevice(
     device: Device,
   ) {
-    const shouldDelete = window.confirm(
-      `Deseja realmente excluir ${device.brand} ${device.model}?`,
-    );
+    const shouldDelete =
+      window.confirm(
+        `Deseja realmente excluir ${device.brand} ${device.model}?`,
+      );
 
     if (!shouldDelete) {
       return;
@@ -213,11 +269,13 @@ export function Devices() {
     try {
       await deleteDevice(device.id);
 
-      setDevices((currentDevices) =>
-        currentDevices.filter(
-          (currentDevice) =>
-            currentDevice.id !== device.id,
-        ),
+      setDevices(
+        (currentDevices) =>
+          currentDevices.filter(
+            (currentDevice) =>
+              currentDevice.id !==
+              device.id,
+          ),
       );
 
       setSuccessMessage(
@@ -243,8 +301,8 @@ export function Devices() {
           <h1>Dispositivos</h1>
 
           <p>
-            Consulte e gerencie os aparelhos
-            cadastrados.
+            Consulte e gerencie os
+            aparelhos cadastrados.
           </p>
         </div>
 
@@ -253,6 +311,7 @@ export function Devices() {
           className="devices__create"
         >
           <Plus size={19} />
+
           Novo dispositivo
         </Link>
       </section>
@@ -288,7 +347,7 @@ export function Devices() {
                   event.target.value,
                 )
               }
-              placeholder="Pesquisar por marca, modelo, IMEI ou cor"
+              placeholder="Pesquisar por marca, modelo, IMEI, cor ou fornecedor"
               aria-label="Pesquisar dispositivos"
               disabled={isLoading}
             />
@@ -307,6 +366,10 @@ export function Devices() {
           >
             <option value="TODOS">
               Todos os status
+            </option>
+
+            <option value="PENDENTE_INFORMACOES">
+              Pendentes de informações
             </option>
 
             <option value="DISPONIVEL">
@@ -336,19 +399,24 @@ export function Devices() {
             <div className="devices__result">
               <strong>
                 {filteredDevices.length}{' '}
-                {filteredDevices.length === 1
+                {filteredDevices.length ===
+                1
                   ? 'dispositivo encontrado'
                   : 'dispositivos encontrados'}
               </strong>
             </div>
 
-            {filteredDevices.length > 0 ? (
+            {filteredDevices.length >
+            0 ? (
               <>
                 <div className="devices__table-container">
                   <table className="devices__table">
                     <thead>
                       <tr>
-                        <th>Dispositivo</th>
+                        <th>
+                          Dispositivo
+                        </th>
+
                         <th>IMEI</th>
                         <th>Entrada</th>
                         <th>Compra</th>
@@ -367,13 +435,17 @@ export function Devices() {
 
                           return (
                             <tr
-                              key={device.id}
+                              key={
+                                device.id
+                              }
                             >
                               <td>
                                 <div className="devices__device">
                                   <div className="devices__device-icon">
                                     <Smartphone
-                                      size={20}
+                                      size={
+                                        20
+                                      }
                                     />
                                   </div>
 
@@ -392,16 +464,19 @@ export function Devices() {
                                         device.storage
                                       }{' '}
                                       ·{' '}
-                                      {
-                                        device.color
-                                      }
+                                      {getOptionalValue(
+                                        device.color,
+                                        'Cor pendente',
+                                      )}
                                     </span>
                                   </div>
                                 </div>
                               </td>
 
                               <td>
-                                {device.imei}
+                                {getOptionalValue(
+                                  device.imei,
+                                )}
                               </td>
 
                               <td>
@@ -417,7 +492,7 @@ export function Devices() {
                               </td>
 
                               <td>
-                                {formatCurrency(
+                                {formatNullableCurrency(
                                   device.salePrice,
                                 )}
                               </td>
@@ -441,7 +516,9 @@ export function Devices() {
                                     title="Visualizar"
                                   >
                                     <Eye
-                                      size={18}
+                                      size={
+                                        18
+                                      }
                                     />
                                   </Link>
 
@@ -460,7 +537,9 @@ export function Devices() {
                                     }
                                   >
                                     <Trash2
-                                      size={18}
+                                      size={
+                                        18
+                                      }
                                     />
                                   </button>
                                 </div>
@@ -508,9 +587,10 @@ export function Devices() {
                                     device.storage
                                   }{' '}
                                   ·{' '}
-                                  {
-                                    device.color
-                                  }
+                                  {getOptionalValue(
+                                    device.color,
+                                    'Cor pendente',
+                                  )}
                                 </span>
                               </div>
                             </div>
@@ -527,8 +607,11 @@ export function Devices() {
                           <div className="devices__card-info">
                             <div>
                               <span>IMEI</span>
+
                               <strong>
-                                {device.imei}
+                                {getOptionalValue(
+                                  device.imei,
+                                )}
                               </strong>
                             </div>
 
@@ -546,7 +629,8 @@ export function Devices() {
 
                             <div>
                               <span>
-                                Valor de compra
+                                Valor de
+                                compra
                               </span>
 
                               <strong>
@@ -558,11 +642,12 @@ export function Devices() {
 
                             <div>
                               <span>
-                                Valor de venda
+                                Valor de
+                                venda
                               </span>
 
                               <strong>
-                                {formatCurrency(
+                                {formatNullableCurrency(
                                   device.salePrice,
                                 )}
                               </strong>
@@ -573,9 +658,8 @@ export function Devices() {
                             <Link
                               to={`/dispositivos/${device.id}`}
                             >
-                              <Eye
-                                size={18}
-                              />
+                              <Eye size={18} />
+
                               Ver detalhes
                             </Link>
 
@@ -608,20 +692,25 @@ export function Devices() {
             ) : (
               <div className="devices__empty">
                 <div className="devices__empty-icon">
-                  <Smartphone size={32} />
+                  <Smartphone
+                    size={32}
+                  />
                 </div>
 
                 <h2>
-                  Nenhum dispositivo encontrado
+                  Nenhum dispositivo
+                  encontrado
                 </h2>
 
                 <p>
-                  Cadastre um aparelho ou altere
-                  os filtros utilizados.
+                  Cadastre um aparelho ou
+                  altere os filtros
+                  utilizados.
                 </p>
 
                 <Link to="/dispositivos/cadastrar">
                   <Plus size={18} />
+
                   Cadastrar dispositivo
                 </Link>
               </div>

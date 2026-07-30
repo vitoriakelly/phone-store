@@ -14,11 +14,8 @@ import {
   useNavigate,
   useParams,
 } from 'react-router-dom';
+import { z } from 'zod';
 
-import {
-  deviceSchema,
-  type DeviceFormData,
-} from '../../schemas/deviceSchema';
 import { ApiError } from '../../services/api';
 import {
   getDeviceById,
@@ -27,6 +24,189 @@ import {
 import type { Device } from '../../types/device';
 
 import '../CreateDevice/styles.scss';
+
+const editDeviceSchema = z
+  .object({
+    brand: z
+      .string()
+      .trim()
+      .min(
+        2,
+        'A marca deve possuir pelo menos 2 caracteres.',
+      )
+      .max(
+        80,
+        'A marca deve possuir no máximo 80 caracteres.',
+      ),
+
+    model: z
+      .string()
+      .trim()
+      .min(
+        2,
+        'O modelo deve possuir pelo menos 2 caracteres.',
+      )
+      .max(
+        120,
+        'O modelo deve possuir no máximo 120 caracteres.',
+      ),
+
+    storage: z
+      .string()
+      .trim()
+      .min(
+        1,
+        'Informe o armazenamento.',
+      )
+      .max(
+        30,
+        'O armazenamento deve possuir no máximo 30 caracteres.',
+      ),
+
+    color: z
+      .string()
+      .trim()
+      .max(
+        50,
+        'A cor deve possuir no máximo 50 caracteres.',
+      ),
+
+    imei: z
+      .string()
+      .trim()
+      .refine(
+        (value) =>
+          value === '' ||
+          /^\d{15}$/.test(value),
+        'O IMEI deve possuir exatamente 15 números.',
+      ),
+
+    batteryHealth: z
+      .number()
+      .int(
+        'A saúde da bateria deve ser um número inteiro.',
+      )
+      .min(
+        0,
+        'A saúde da bateria não pode ser menor que 0%.',
+      )
+      .max(
+        100,
+        'A saúde da bateria não pode ser maior que 100%.',
+      )
+      .optional(),
+
+    condition: z.enum([
+      'NOVO',
+      'SEMINOVO',
+      'USADO',
+    ]),
+
+    purchasePrice: z
+      .number({
+        message:
+          'Informe o valor de compra.',
+      })
+      .positive(
+        'O valor de compra deve ser maior que zero.',
+      ),
+
+    salePrice: z
+      .number({
+        message:
+          'O valor de venda deve ser um número.',
+      })
+      .positive(
+        'O valor de venda deve ser maior que zero.',
+      )
+      .optional(),
+
+    supplier: z
+      .string()
+      .trim()
+      .max(
+        160,
+        'O fornecedor deve possuir no máximo 160 caracteres.',
+      )
+      .optional(),
+
+    entryDate: z
+      .string()
+      .regex(
+        /^\d{4}-\d{2}-\d{2}$/,
+        'Informe uma data válida.',
+      ),
+
+    status: z.enum([
+      'PENDENTE_INFORMACOES',
+      'DISPONIVEL',
+      'RESERVADO',
+      'VENDIDO',
+    ]),
+
+    notes: z
+      .string()
+      .trim()
+      .max(
+        2000,
+        'As observações devem possuir no máximo 2000 caracteres.',
+      )
+      .optional(),
+  })
+  .superRefine((data, context) => {
+    if (
+      data.salePrice !== undefined &&
+      data.salePrice <
+        data.purchasePrice
+    ) {
+      context.addIssue({
+        code: 'custom',
+        path: ['salePrice'],
+        message:
+          'O valor de venda não pode ser menor que o valor de compra.',
+      });
+    }
+
+    if (
+      data.status ===
+      'PENDENTE_INFORMACOES'
+    ) {
+      return;
+    }
+
+    if (!data.color) {
+      context.addIssue({
+        code: 'custom',
+        path: ['color'],
+        message:
+          'Informe a cor antes de liberar o dispositivo.',
+      });
+    }
+
+    if (!data.imei) {
+      context.addIssue({
+        code: 'custom',
+        path: ['imei'],
+        message:
+          'Informe o IMEI antes de liberar o dispositivo.',
+      });
+    }
+
+    if (
+      data.salePrice === undefined
+    ) {
+      context.addIssue({
+        code: 'custom',
+        path: ['salePrice'],
+        message:
+          'Informe o valor de venda antes de liberar o dispositivo.',
+      });
+    }
+  });
+
+type EditDeviceFormData = z.infer<
+  typeof editDeviceSchema
+>;
 
 export function EditDevice() {
   const { id } = useParams();
@@ -52,13 +232,39 @@ export function EditDevice() {
     handleSubmit,
     reset,
     setError,
+    watch,
     formState: {
       errors,
       isSubmitting,
     },
-  } = useForm<DeviceFormData>({
-    resolver: zodResolver(deviceSchema),
+  } = useForm<
+    EditDeviceFormData
+  >({
+    resolver: zodResolver(
+      editDeviceSchema,
+    ),
+
+    defaultValues: {
+      brand: '',
+      model: '',
+      storage: '',
+      color: '',
+      imei: '',
+      condition: 'SEMINOVO',
+      supplier: '',
+      entryDate: '',
+      status:
+        'PENDENTE_INFORMACOES',
+      notes: '',
+    },
   });
+
+  const selectedStatus =
+    watch('status');
+
+  const isPending =
+    selectedStatus ===
+    'PENDENTE_INFORMACOES';
 
   useEffect(() => {
     let isMounted = true;
@@ -67,9 +273,11 @@ export function EditDevice() {
       if (!id) {
         if (isMounted) {
           setNotFound(true);
+
           setLoadError(
             'O identificador do dispositivo não foi informado.',
           );
+
           setIsLoading(false);
         }
 
@@ -93,20 +301,40 @@ export function EditDevice() {
         reset({
           brand: apiDevice.brand,
           model: apiDevice.model,
-          storage: apiDevice.storage,
-          color: apiDevice.color,
-          imei: apiDevice.imei,
+          storage:
+            apiDevice.storage,
+
+          color:
+            apiDevice.color ?? '',
+
+          imei:
+            apiDevice.imei ?? '',
+
           batteryHealth:
-            apiDevice.batteryHealth ?? undefined,
-          condition: apiDevice.condition,
+            apiDevice.batteryHealth ??
+            undefined,
+
+          condition:
+            apiDevice.condition,
+
           purchasePrice:
             apiDevice.purchasePrice,
-          salePrice: apiDevice.salePrice,
+
+          salePrice:
+            apiDevice.salePrice ??
+            undefined,
+
           supplier:
             apiDevice.supplier ?? '',
-          entryDate: apiDevice.entryDate,
-          status: apiDevice.status,
-          notes: apiDevice.notes ?? '',
+
+          entryDate:
+            apiDevice.entryDate,
+
+          status:
+            apiDevice.status,
+
+          notes:
+            apiDevice.notes ?? '',
         });
       } catch (error) {
         if (!isMounted) {
@@ -120,6 +348,7 @@ export function EditDevice() {
           error.status === 404
         ) {
           setNotFound(true);
+
           setLoadError(
             'O aparelho não existe ou foi excluído.',
           );
@@ -127,8 +356,12 @@ export function EditDevice() {
           return;
         }
 
-        if (error instanceof ApiError) {
-          setLoadError(error.message);
+        if (
+          error instanceof ApiError
+        ) {
+          setLoadError(
+            error.message,
+          );
         } else {
           setLoadError(
             'Não foi possível carregar o dispositivo. Verifique se a API está funcionando.',
@@ -149,7 +382,7 @@ export function EditDevice() {
   }, [id, reset]);
 
   async function handleEditDevice(
-    data: DeviceFormData,
+    data: EditDeviceFormData,
   ) {
     if (!id || !device) {
       return;
@@ -163,18 +396,34 @@ export function EditDevice() {
           brand: data.brand,
           model: data.model,
           storage: data.storage,
-          color: data.color,
-          imei: data.imei,
+
+          color:
+            data.color || undefined,
+
+          imei:
+            data.imei || undefined,
+
           batteryHealth:
             data.batteryHealth,
-          condition: data.condition,
+
+          condition:
+            data.condition,
+
           purchasePrice:
             data.purchasePrice,
-          salePrice: data.salePrice,
+
+          salePrice:
+            data.salePrice,
+
           supplier:
             data.supplier || undefined,
-          entryDate: data.entryDate,
-          status: data.status,
+
+          entryDate:
+            data.entryDate,
+
+          status:
+            data.status,
+
           notes:
             data.notes || undefined,
         });
@@ -191,27 +440,69 @@ export function EditDevice() {
         },
       );
     } catch (error) {
-      if (error instanceof ApiError) {
-        const imeiError =
-          error.errors?.imei?.[0];
+      if (
+        error instanceof ApiError
+      ) {
+        const fieldNames: Array<
+          keyof EditDeviceFormData
+        > = [
+          'brand',
+          'model',
+          'storage',
+          'color',
+          'imei',
+          'batteryHealth',
+          'condition',
+          'purchasePrice',
+          'salePrice',
+          'supplier',
+          'entryDate',
+          'status',
+          'notes',
+        ];
+
+        let hasFieldError = false;
+
+        fieldNames.forEach(
+          (fieldName) => {
+            const fieldMessage =
+              error.errors?.[
+                fieldName
+              ]?.[0];
+
+            if (fieldMessage) {
+              hasFieldError = true;
+
+              setError(fieldName, {
+                type: 'server',
+                message:
+                  fieldMessage,
+              });
+            }
+          },
+        );
 
         if (
-          imeiError ||
-          (error.status === 409 &&
-            error.message
-              .toLowerCase()
-              .includes('imei'))
+          error.status === 409 &&
+          error.message
+            .toLowerCase()
+            .includes('imei')
         ) {
           setError('imei', {
             type: 'server',
             message:
-              imeiError ?? error.message,
+              error.message,
           });
 
           return;
         }
 
-        setSubmitError(error.message);
+        if (!hasFieldError) {
+          setSubmitError(
+            error.message,
+          );
+        }
+
         return;
       }
 
@@ -234,11 +525,13 @@ export function EditDevice() {
             <Smartphone size={28} />
           </div>
 
-          <h1>Carregando dispositivo...</h1>
+          <h1>
+            Carregando dispositivo...
+          </h1>
 
           <p>
-            Aguarde enquanto buscamos os dados do
-            aparelho.
+            Aguarde enquanto buscamos os
+            dados do aparelho.
           </p>
         </section>
       </main>
@@ -249,7 +542,9 @@ export function EditDevice() {
     return (
       <main className="create-device">
         <section className="create-device__section">
-          <h1>Dispositivo não encontrado</h1>
+          <h1>
+            Dispositivo não encontrado
+          </h1>
 
           <p>
             {loadError ||
@@ -261,6 +556,7 @@ export function EditDevice() {
             className="create-device__back"
           >
             <ArrowLeft size={18} />
+
             Voltar para dispositivos
           </Link>
         </section>
@@ -277,13 +573,15 @@ export function EditDevice() {
             className="create-device__back"
           >
             <ArrowLeft size={18} />
+
             Voltar para os detalhes
           </Link>
 
           <h1>Editar dispositivo</h1>
 
           <p>
-            Atualize as informações do aparelho.
+            Atualize as informações do
+            aparelho.
           </p>
         </div>
 
@@ -291,6 +589,18 @@ export function EditDevice() {
           <Smartphone size={28} />
         </div>
       </section>
+
+      {isPending && (
+        <div
+          className="create-device__submit-error"
+          role="status"
+        >
+          Este dispositivo está pendente de
+          informações. Preencha cor, IMEI e
+          valor de venda para alterar o status
+          para Disponível.
+        </div>
+      )}
 
       <form
         className="create-device__form"
@@ -301,10 +611,13 @@ export function EditDevice() {
       >
         <section className="create-device__section">
           <div className="create-device__section-heading">
-            <h2>Informações do aparelho</h2>
+            <h2>
+              Informações do aparelho
+            </h2>
 
             <p>
-              Dados de identificação do dispositivo.
+              Dados de identificação do
+              dispositivo.
             </p>
           </div>
 
@@ -387,20 +700,28 @@ export function EditDevice() {
 
               {errors.storage && (
                 <span className="create-device__error">
-                  {errors.storage.message}
+                  {
+                    errors.storage
+                      .message
+                  }
                 </span>
               )}
             </div>
 
             <div className="create-device__field">
               <label htmlFor="color">
-                Cor *
+                Cor{' '}
+                {!isPending && '*'}
               </label>
 
               <input
                 id="color"
                 type="text"
-                placeholder="Ex.: Preto"
+                placeholder={
+                  isPending
+                    ? 'Pode ser preenchida posteriormente'
+                    : 'Ex.: Preto'
+                }
                 {...register('color')}
               />
 
@@ -413,7 +734,8 @@ export function EditDevice() {
 
             <div className="create-device__field">
               <label htmlFor="imei">
-                IMEI *
+                IMEI{' '}
+                {!isPending && '*'}
               </label>
 
               <input
@@ -421,7 +743,11 @@ export function EditDevice() {
                 type="text"
                 inputMode="numeric"
                 maxLength={15}
-                placeholder="Digite os 15 números"
+                placeholder={
+                  isPending
+                    ? 'Pode ser preenchido posteriormente'
+                    : 'Digite os 15 números'
+                }
                 {...register('imei', {
                   onChange: (event) => {
                     event.target.value =
@@ -454,10 +780,14 @@ export function EditDevice() {
                   {...register(
                     'batteryHealth',
                     {
-                      setValueAs: (value) =>
+                      setValueAs: (
+                        value,
+                      ) =>
                         value === ''
                           ? undefined
-                          : Number(value),
+                          : Number(
+                              value,
+                            ),
                     },
                   )}
                 />
@@ -468,7 +798,8 @@ export function EditDevice() {
               {errors.batteryHealth && (
                 <span className="create-device__error">
                   {
-                    errors.batteryHealth
+                    errors
+                      .batteryHealth
                       .message
                   }
                 </span>
@@ -482,7 +813,9 @@ export function EditDevice() {
 
               <select
                 id="condition"
-                {...register('condition')}
+                {...register(
+                  'condition',
+                )}
               >
                 <option value="NOVO">
                   Novo
@@ -499,7 +832,10 @@ export function EditDevice() {
 
               {errors.condition && (
                 <span className="create-device__error">
-                  {errors.condition.message}
+                  {
+                    errors.condition
+                      .message
+                  }
                 </span>
               )}
             </div>
@@ -513,6 +849,10 @@ export function EditDevice() {
                 id="status"
                 {...register('status')}
               >
+                <option value="PENDENTE_INFORMACOES">
+                  Pendente de informações
+                </option>
+
                 <option value="DISPONIVEL">
                   Disponível
                 </option>
@@ -540,7 +880,8 @@ export function EditDevice() {
             <h2>Entrada e valores</h2>
 
             <p>
-              Informações comerciais do aparelho.
+              Informações comerciais do
+              aparelho.
             </p>
           </div>
 
@@ -561,7 +902,14 @@ export function EditDevice() {
                   {...register(
                     'purchasePrice',
                     {
-                      valueAsNumber: true,
+                      setValueAs: (
+                        value,
+                      ) =>
+                        value === ''
+                          ? undefined
+                          : Number(
+                              value,
+                            ),
                     },
                   )}
                 />
@@ -570,7 +918,8 @@ export function EditDevice() {
               {errors.purchasePrice && (
                 <span className="create-device__error">
                   {
-                    errors.purchasePrice
+                    errors
+                      .purchasePrice
                       .message
                   }
                 </span>
@@ -579,7 +928,8 @@ export function EditDevice() {
 
             <div className="create-device__field">
               <label htmlFor="salePrice">
-                Valor de venda *
+                Valor de venda{' '}
+                {!isPending && '*'}
               </label>
 
               <div className="create-device__input-prefix">
@@ -590,15 +940,33 @@ export function EditDevice() {
                   type="number"
                   min="0"
                   step="0.01"
-                  {...register('salePrice', {
-                    valueAsNumber: true,
-                  })}
+                  placeholder={
+                    isPending
+                      ? 'Pode ser definido depois'
+                      : undefined
+                  }
+                  {...register(
+                    'salePrice',
+                    {
+                      setValueAs: (
+                        value,
+                      ) =>
+                        value === ''
+                          ? undefined
+                          : Number(
+                              value,
+                            ),
+                    },
+                  )}
                 />
               </div>
 
               {errors.salePrice && (
                 <span className="create-device__error">
-                  {errors.salePrice.message}
+                  {
+                    errors.salePrice
+                      .message
+                  }
                 </span>
               )}
             </div>
@@ -611,12 +979,17 @@ export function EditDevice() {
               <input
                 id="entryDate"
                 type="date"
-                {...register('entryDate')}
+                {...register(
+                  'entryDate',
+                )}
               />
 
               {errors.entryDate && (
                 <span className="create-device__error">
-                  {errors.entryDate.message}
+                  {
+                    errors.entryDate
+                      .message
+                  }
                 </span>
               )}
             </div>
@@ -630,12 +1003,17 @@ export function EditDevice() {
                 id="supplier"
                 type="text"
                 placeholder="Nome do fornecedor"
-                {...register('supplier')}
+                {...register(
+                  'supplier',
+                )}
               />
 
               {errors.supplier && (
                 <span className="create-device__error">
-                  {errors.supplier.message}
+                  {
+                    errors.supplier
+                      .message
+                  }
                 </span>
               )}
             </div>
@@ -647,7 +1025,8 @@ export function EditDevice() {
             <h2>Observações</h2>
 
             <p>
-              Informações adicionais sobre o aparelho.
+              Informações adicionais sobre
+              o aparelho.
             </p>
           </div>
 
