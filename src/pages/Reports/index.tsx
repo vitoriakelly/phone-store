@@ -3,14 +3,17 @@ import {
   CalendarDays,
   CircleDollarSign,
   PackageCheck,
+  Percent,
   Printer,
   RotateCcw,
   Search,
   Smartphone,
   Truck,
+  Users,
 } from 'lucide-react';
 import {
   type FormEvent,
+  type ReactNode,
   useEffect,
   useMemo,
   useState,
@@ -19,26 +22,37 @@ import { Link } from 'react-router-dom';
 
 import { ApiError } from '../../services/api';
 import {
+  getCommissionsReport,
   getDevicesReport,
   getSalesReport,
 } from '../../services/reportApi';
+import { listSellers } from '../../services/userApi';
 import type { Device } from '../../types/device';
 import type {
+  CommissionReportSale,
+  CommissionsReportFilters,
+  CommissionsReportMeta,
+  CommissionSellerSummary,
   DevicesReportFilters,
   DevicesReportMeta,
   SalesReportFilters,
   SalesReportMeta,
 } from '../../types/report';
 import type {
+  CommissionType,
   PaymentMethod,
   Sale,
   SalePayment,
 } from '../../types/sale';
+import type { Seller } from '../../types/user';
 import { formatCurrency } from '../../utils/currency';
 
 import './styles.scss';
 
-type ReportTab = 'sales' | 'devices';
+type ReportTab =
+  | 'sales'
+  | 'devices'
+  | 'commissions';
 
 type PaymentFilter =
   | 'TODOS'
@@ -50,6 +64,7 @@ const initialSalesFilters: SalesReportFilters = {
   imei: '',
   customerName: '',
   deviceName: '',
+  sellerId: '',
 };
 
 const initialDevicesFilters: DevicesReportFilters = {
@@ -61,16 +76,28 @@ const initialDevicesFilters: DevicesReportFilters = {
   status: undefined,
 };
 
+const initialCommissionsFilters:
+  CommissionsReportFilters = {
+    startDate: '',
+    endDate: '',
+    sellerId: '',
+  };
+
 const initialSalesMeta: SalesReportMeta = {
   total: 0,
+  totalGrossRevenue: 0,
+  totalDiscount: 0,
   totalRevenue: 0,
   totalCost: 0,
+  totalCommission: 0,
   totalProfit: 0,
+  totalProfitAfterCommission: 0,
   averageTicket: 0,
 };
 
 const initialDevicesMeta: DevicesReportMeta = {
   total: 0,
+  pending: 0,
   available: 0,
   reserved: 0,
   sold: 0,
@@ -79,9 +106,24 @@ const initialDevicesMeta: DevicesReportMeta = {
   potentialProfit: 0,
 };
 
-const dateFormatter = new Intl.DateTimeFormat(
-  'pt-BR',
-);
+const initialCommissionsMeta:
+  CommissionsReportMeta = {
+    totalSales: 0,
+    commissionedSales: 0,
+    totalSellers: 0,
+    totalGrossRevenue: 0,
+    totalDiscount: 0,
+    totalNetRevenue: 0,
+    totalCost: 0,
+    totalCommission: 0,
+    totalProfitBeforeCommission: 0,
+    totalProfitAfterCommission: 0,
+    averageTicket: 0,
+    averageCommission: 0,
+  };
+
+const dateFormatter =
+  new Intl.DateTimeFormat('pt-BR');
 
 function formatDate(
   value: string | null | undefined,
@@ -97,14 +139,10 @@ function formatDate(
   let parsedDate: Date;
 
   if (dateMatch) {
-    const year = Number(dateMatch[1]);
-    const month = Number(dateMatch[2]);
-    const day = Number(dateMatch[3]);
-
     parsedDate = new Date(
-      year,
-      month - 1,
-      day,
+      Number(dateMatch[1]),
+      Number(dateMatch[2]) - 1,
+      Number(dateMatch[3]),
       12,
     );
   } else {
@@ -112,12 +150,16 @@ function formatDate(
   }
 
   if (
-    Number.isNaN(parsedDate.getTime())
+    Number.isNaN(
+      parsedDate.getTime(),
+    )
   ) {
     return 'Data inválida';
   }
 
-  return dateFormatter.format(parsedDate);
+  return dateFormatter.format(
+    parsedDate,
+  );
 }
 
 function getPaymentMethodLabel(
@@ -142,6 +184,7 @@ function getPaymentMethodLabel(
 
   return labels[paymentMethod];
 }
+
 function getSalePayments(
   sale: Sale,
 ): SalePayment[] {
@@ -184,11 +227,8 @@ function getPaymentDescription(
 function getPaymentSummary(
   sale: Sale,
 ) {
-  const payments =
-    getSalePayments(sale);
-
   const descriptions =
-    payments.map(
+    getSalePayments(sale).map(
       getPaymentDescription,
     );
 
@@ -251,6 +291,49 @@ function getDeviceConditionLabel(
 
   return labels[condition];
 }
+
+function getCommissionTypeLabel(
+  type: CommissionType | null,
+) {
+  if (type === 'PERCENTAGE') {
+    return 'Porcentagem';
+  }
+
+  if (type === 'FIXED') {
+    return 'Valor fixo';
+  }
+
+  return 'Sem comissão';
+}
+
+function getCommissionRule(
+  sale: {
+    commissionType:
+      CommissionType | null;
+    commissionValue: number | null;
+  },
+) {
+  if (
+    sale.commissionType ===
+      'PERCENTAGE' &&
+    sale.commissionValue !== null
+  ) {
+    return `${sale.commissionValue}%`;
+  }
+
+  if (
+    sale.commissionType ===
+      'FIXED' &&
+    sale.commissionValue !== null
+  ) {
+    return `Fixo: ${formatCurrency(
+      sale.commissionValue,
+    )}`;
+  }
+
+  return 'Sem comissão';
+}
+
 function formatNullableCurrency(
   value: number | null,
 ) {
@@ -293,6 +376,14 @@ export function Reports() {
   );
 
   const [
+    commissionsFilters,
+    setCommissionsFilters,
+  ] =
+    useState<CommissionsReportFilters>(
+      initialCommissionsFilters,
+    );
+
+  const [
     salesPaymentFilter,
     setSalesPaymentFilter,
   ] = useState<PaymentFilter>(
@@ -305,6 +396,23 @@ export function Reports() {
   const [devices, setDevices] =
     useState<Device[]>([]);
 
+  const [
+    commissionSales,
+    setCommissionSales,
+  ] = useState<
+    CommissionReportSale[]
+  >([]);
+
+  const [
+    commissionSellers,
+    setCommissionSellers,
+  ] = useState<
+    CommissionSellerSummary[]
+  >([]);
+
+  const [sellers, setSellers] =
+    useState<Seller[]>([]);
+
   const [salesMeta, setSalesMeta] =
     useState<SalesReportMeta>(
       initialSalesMeta,
@@ -315,11 +423,33 @@ export function Reports() {
       initialDevicesMeta,
     );
 
+  const [
+    commissionsMeta,
+    setCommissionsMeta,
+  ] = useState<CommissionsReportMeta>(
+    initialCommissionsMeta,
+  );
+
   const [isLoading, setIsLoading] =
     useState(false);
 
+  const [
+    isLoadingSellers,
+    setIsLoadingSellers,
+  ] = useState(true);
+
   const [loadError, setLoadError] =
     useState('');
+
+  const [
+    hasLoadedDevices,
+    setHasLoadedDevices,
+  ] = useState(false);
+
+  const [
+    hasLoadedCommissions,
+    setHasLoadedCommissions,
+  ] = useState(false);
 
   async function loadSalesReport(
     filters: SalesReportFilters,
@@ -337,13 +467,11 @@ export function Reports() {
       setSales([]);
       setSalesMeta(initialSalesMeta);
 
-      if (error instanceof ApiError) {
-        setLoadError(error.message);
-      } else {
-        setLoadError(
-          'Não foi possível carregar o relatório de vendas.',
-        );
-      }
+      setLoadError(
+        error instanceof ApiError
+          ? error.message
+          : 'Não foi possível carregar o relatório de vendas.',
+      );
     } finally {
       setIsLoading(false);
     }
@@ -361,19 +489,62 @@ export function Reports() {
 
       setDevices(response.data);
       setDevicesMeta(response.meta);
+      setHasLoadedDevices(true);
     } catch (error) {
       setDevices([]);
       setDevicesMeta(
         initialDevicesMeta,
       );
 
-      if (error instanceof ApiError) {
-        setLoadError(error.message);
-      } else {
-        setLoadError(
-          'Não foi possível carregar o relatório de dispositivos.',
+      setLoadError(
+        error instanceof ApiError
+          ? error.message
+          : 'Não foi possível carregar o relatório de dispositivos.',
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  async function loadCommissionsReport(
+    filters:
+      CommissionsReportFilters,
+  ) {
+    setIsLoading(true);
+    setLoadError('');
+
+    try {
+      const response =
+        await getCommissionsReport(
+          filters,
         );
-      }
+
+      setCommissionSales(
+        response.data,
+      );
+
+      setCommissionSellers(
+        response.sellers,
+      );
+
+      setCommissionsMeta(
+        response.meta,
+      );
+
+      setHasLoadedCommissions(true);
+    } catch (error) {
+      setCommissionSales([]);
+      setCommissionSellers([]);
+
+      setCommissionsMeta(
+        initialCommissionsMeta,
+      );
+
+      setLoadError(
+        error instanceof ApiError
+          ? error.message
+          : 'Não foi possível carregar o relatório de comissões.',
+      );
     } finally {
       setIsLoading(false);
     }
@@ -383,6 +554,35 @@ export function Reports() {
     void loadSalesReport(
       initialSalesFilters,
     );
+
+    let isMounted = true;
+
+    async function loadSellers() {
+      setIsLoadingSellers(true);
+
+      try {
+        const response =
+          await listSellers();
+
+        if (isMounted) {
+          setSellers(response);
+        }
+      } catch {
+        if (isMounted) {
+          setSellers([]);
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoadingSellers(false);
+        }
+      }
+    }
+
+    void loadSellers();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   function handleTabChange(
@@ -393,10 +593,19 @@ export function Reports() {
 
     if (
       tab === 'devices' &&
-      devices.length === 0
+      !hasLoadedDevices
     ) {
       void loadDevicesReport(
         devicesFilters,
+      );
+    }
+
+    if (
+      tab === 'commissions' &&
+      !hasLoadedCommissions
+    ) {
+      void loadCommissionsReport(
+        commissionsFilters,
       );
     }
   }
@@ -421,6 +630,16 @@ export function Reports() {
     );
   }
 
+  function handleCommissionsSubmit(
+    event: FormEvent<HTMLFormElement>,
+  ) {
+    event.preventDefault();
+
+    void loadCommissionsReport(
+      commissionsFilters,
+    );
+  }
+
   function handleClearSalesFilters() {
     setSalesFilters(
       initialSalesFilters,
@@ -442,6 +661,16 @@ export function Reports() {
 
     void loadDevicesReport(
       initialDevicesFilters,
+    );
+  }
+
+  function handleClearCommissionsFilters() {
+    setCommissionsFilters(
+      initialCommissionsFilters,
+    );
+
+    void loadCommissionsReport(
+      initialCommissionsFilters,
     );
   }
 
@@ -478,6 +707,22 @@ export function Reports() {
       const total =
         filteredSales.length;
 
+      const totalGrossRevenue =
+        filteredSales.reduce(
+          (sum, sale) =>
+            sum +
+            sale.grossSalePrice,
+          0,
+        );
+
+      const totalDiscount =
+        filteredSales.reduce(
+          (sum, sale) =>
+            sum +
+            sale.discountAmount,
+          0,
+        );
+
       const totalRevenue =
         filteredSales.reduce(
           (sum, sale) =>
@@ -488,7 +733,16 @@ export function Reports() {
       const totalCost =
         filteredSales.reduce(
           (sum, sale) =>
-            sum + sale.purchasePrice,
+            sum +
+            sale.purchasePrice,
+          0,
+        );
+
+      const totalCommission =
+        filteredSales.reduce(
+          (sum, sale) =>
+            sum +
+            sale.commissionAmount,
           0,
         );
 
@@ -497,9 +751,16 @@ export function Reports() {
 
       return {
         total,
+        totalGrossRevenue,
+        totalDiscount,
         totalRevenue,
         totalCost,
+        totalCommission,
         totalProfit,
+
+        totalProfitAfterCommission:
+          totalProfit -
+          totalCommission,
 
         averageTicket:
           total > 0
@@ -513,21 +774,14 @@ export function Reports() {
     ]);
 
   function handlePrintReport() {
-    const isSalesReport =
-      activeTab === 'sales';
-
-    const hasNoData =
-      isSalesReport
-        ? filteredSales.length === 0
-        : devices.length === 0;
-
-    if (hasNoData) {
-      setLoadError(
-        'Não existem registros para imprimir.',
-      );
-
-      return;
-    }
+    const generatedAt =
+      new Intl.DateTimeFormat(
+        'pt-BR',
+        {
+          dateStyle: 'short',
+          timeStyle: 'short',
+        },
+      ).format(new Date());
 
     const printWindow = window.open(
       'about:blank',
@@ -543,340 +797,241 @@ export function Reports() {
       return;
     }
 
-    const generatedAt =
-      new Intl.DateTimeFormat(
-        'pt-BR',
-        {
-          dateStyle: 'short',
-          timeStyle: 'short',
-        },
-      ).format(new Date());
+    let reportTitle = '';
+    let summaryHtml = '';
+    let tablesHtml = '';
 
-    const reportTitle =
-      isSalesReport
-        ? 'Relatório de vendas'
-        : 'Relatório de dispositivos';
+    if (activeTab === 'sales') {
+      if (filteredSales.length === 0) {
+        printWindow.close();
 
-    const summaryHtml =
-      isSalesReport
-        ? `
-          <section class="summary">
-            <article>
-              <span>Vendas encontradas</span>
-              <strong>
-                ${displayedSalesMeta.total}
-              </strong>
-            </article>
+        setLoadError(
+          'Não existem vendas para imprimir.',
+        );
 
-            <article>
-              <span>Faturamento</span>
-              <strong>
-                ${escapeHtml(
-          formatCurrency(
-            displayedSalesMeta.totalRevenue,
-          ),
-        )}
-              </strong>
-            </article>
+        return;
+      }
 
-            <article>
-              <span>Custo total</span>
-              <strong>
-                ${escapeHtml(
-          formatCurrency(
-            displayedSalesMeta.totalCost,
-          ),
-        )}
-              </strong>
-            </article>
+      reportTitle =
+        'Relatório de vendas';
 
-            <article>
-              <span>Lucro total</span>
-              <strong>
-                ${escapeHtml(
-          formatCurrency(
-            displayedSalesMeta.totalProfit,
-          ),
-        )}
-              </strong>
-            </article>
+      summaryHtml = `
+        <section class="summary">
+          <article><span>Vendas</span><strong>${displayedSalesMeta.total}</strong></article>
+          <article><span>Valor bruto</span><strong>${escapeHtml(formatCurrency(displayedSalesMeta.totalGrossRevenue))}</strong></article>
+          <article><span>Descontos</span><strong>${escapeHtml(formatCurrency(displayedSalesMeta.totalDiscount))}</strong></article>
+          <article><span>Faturamento líquido</span><strong>${escapeHtml(formatCurrency(displayedSalesMeta.totalRevenue))}</strong></article>
+          <article><span>Comissões</span><strong>${escapeHtml(formatCurrency(displayedSalesMeta.totalCommission))}</strong></article>
+          <article><span>Lucro após comissão</span><strong>${escapeHtml(formatCurrency(displayedSalesMeta.totalProfitAfterCommission))}</strong></article>
+        </section>
+      `;
 
-            <article>
-              <span>Ticket médio</span>
-              <strong>
-                ${escapeHtml(
-          formatCurrency(
-            displayedSalesMeta.averageTicket,
-          ),
-        )}
-              </strong>
-            </article>
-          </section>
-        `
-        : `
-          <section class="summary">
-            <article>
-              <span>
-                Dispositivos encontrados
-              </span>
+      const rows = filteredSales
+        .map(
+          (sale) => `
+            <tr>
+              <td>${escapeHtml(formatDate(sale.soldAt))}</td>
+              <td>${escapeHtml(sale.sellerName)}</td>
+              <td>${escapeHtml(`${sale.deviceBrand} ${sale.deviceModel}`)}</td>
+              <td>${escapeHtml(sale.customerName)}</td>
+              <td>${escapeHtml(formatCurrency(sale.grossSalePrice))}</td>
+              <td>${escapeHtml(formatCurrency(sale.discountAmount))}</td>
+              <td>${escapeHtml(formatCurrency(sale.salePrice))}</td>
+              <td>${escapeHtml(formatCurrency(sale.commissionAmount))}</td>
+              <td>${escapeHtml(formatCurrency(sale.salePrice - sale.purchasePrice - sale.commissionAmount))}</td>
+            </tr>
+          `,
+        )
+        .join('');
 
-              <strong>
-                ${devicesMeta.total}
-              </strong>
-            </article>
+      tablesHtml = `
+        <h2>Vendas</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Data</th>
+              <th>Vendedor</th>
+              <th>Dispositivo</th>
+              <th>Comprador</th>
+              <th>Bruto</th>
+              <th>Desconto</th>
+              <th>Líquido</th>
+              <th>Comissão</th>
+              <th>Lucro final</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      `;
+    }
 
-            <article>
-              <span>Disponíveis</span>
+    if (activeTab === 'devices') {
+      if (devices.length === 0) {
+        printWindow.close();
 
-              <strong>
-                ${devicesMeta.available}
-              </strong>
-            </article>
+        setLoadError(
+          'Não existem dispositivos para imprimir.',
+        );
 
-            <article>
-              <span>Reservados</span>
+        return;
+      }
 
-              <strong>
-                ${devicesMeta.reserved}
-              </strong>
-            </article>
+      reportTitle =
+        'Relatório de dispositivos';
 
-            <article>
-              <span>Vendidos</span>
+      summaryHtml = `
+        <section class="summary">
+          <article><span>Dispositivos</span><strong>${devicesMeta.total}</strong></article>
+          <article><span>Pendentes</span><strong>${devicesMeta.pending}</strong></article>
+          <article><span>Disponíveis</span><strong>${devicesMeta.available}</strong></article>
+          <article><span>Reservados</span><strong>${devicesMeta.reserved}</strong></article>
+          <article><span>Vendidos</span><strong>${devicesMeta.sold}</strong></article>
+          <article><span>Lucro potencial</span><strong>${escapeHtml(formatCurrency(devicesMeta.potentialProfit))}</strong></article>
+        </section>
+      `;
 
-              <strong>
-                ${devicesMeta.sold}
-              </strong>
-            </article>
+      const rows = devices
+        .map(
+          (device) => `
+            <tr>
+              <td>${escapeHtml(formatDate(device.entryDate))}</td>
+              <td>${escapeHtml(`${device.brand} ${device.model}`)}</td>
+              <td>${escapeHtml(device.storage)}</td>
+              <td>${escapeHtml(device.imei || 'Não informado')}</td>
+              <td>${escapeHtml(device.supplier || 'Não informado')}</td>
+              <td>${escapeHtml(getDeviceConditionLabel(device.condition))}</td>
+              <td>${escapeHtml(getDeviceStatusLabel(device.status))}</td>
+              <td>${escapeHtml(formatCurrency(device.purchasePrice))}</td>
+              <td>${escapeHtml(formatNullableCurrency(device.salePrice))}</td>
+            </tr>
+          `,
+        )
+        .join('');
 
-            <article>
-              <span>Valor de compra</span>
+      tablesHtml = `
+        <h2>Dispositivos</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Entrada</th>
+              <th>Dispositivo</th>
+              <th>Armazenamento</th>
+              <th>IMEI</th>
+              <th>Fornecedor</th>
+              <th>Condição</th>
+              <th>Status</th>
+              <th>Compra</th>
+              <th>Venda</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      `;
+    }
 
-              <strong>
-                ${escapeHtml(
-          formatCurrency(
-            devicesMeta
-              .totalPurchaseValue,
-          ),
-        )}
-              </strong>
-            </article>
+    if (activeTab === 'commissions') {
+      if (commissionSales.length === 0) {
+        printWindow.close();
 
-            <article>
-              <span>Valor potencial</span>
+        setLoadError(
+          'Não existem comissões para imprimir.',
+        );
 
-              <strong>
-                ${escapeHtml(
-          formatCurrency(
-            devicesMeta
-              .totalSaleValue,
-          ),
-        )}
-              </strong>
-            </article>
+        return;
+      }
 
-            <article>
-              <span>Lucro potencial</span>
+      reportTitle =
+        'Relatório de comissões';
 
-              <strong>
-                ${escapeHtml(
-          formatCurrency(
-            devicesMeta
-              .potentialProfit,
-          ),
-        )}
-              </strong>
-            </article>
-          </section>
-        `;
+      summaryHtml = `
+        <section class="summary">
+          <article><span>Vendas</span><strong>${commissionsMeta.totalSales}</strong></article>
+          <article><span>Vendas com comissão</span><strong>${commissionsMeta.commissionedSales}</strong></article>
+          <article><span>Vendedores</span><strong>${commissionsMeta.totalSellers}</strong></article>
+          <article><span>Faturamento líquido</span><strong>${escapeHtml(formatCurrency(commissionsMeta.totalNetRevenue))}</strong></article>
+          <article><span>Comissões</span><strong>${escapeHtml(formatCurrency(commissionsMeta.totalCommission))}</strong></article>
+          <article><span>Lucro após comissão</span><strong>${escapeHtml(formatCurrency(commissionsMeta.totalProfitAfterCommission))}</strong></article>
+        </section>
+      `;
 
-    const tableRows =
-      isSalesReport
-        ? filteredSales
-          .map((sale) => {
-            const profit =
-              sale.salePrice -
-              sale.purchasePrice;
-
-            return `
-                <tr>
-                  <td>
-                    ${escapeHtml(
-              formatDate(
-                sale.soldAt,
-              ),
-            )}
-                  </td>
-
-                  <td>
-                    ${escapeHtml(
-              `${sale.deviceBrand} ${sale.deviceModel}`,
-            )}
-                  </td>
-
-                  <td>
-                    ${escapeHtml(
-              sale.deviceImei,
-            )}
-                  </td>
-
-                  <td>
-                    ${escapeHtml(
-              sale.customerName,
-            )}
-                  </td>
-
-                  <td>
-                    ${escapeHtml(
-              getPaymentSummary(
-                sale,
-              ),
-            )}
-                  </td>
-
-                  <td>
-                    ${escapeHtml(
-              formatCurrency(
-                sale.purchasePrice,
-              ),
-            )}
-                  </td>
-
-                  <td>
-                    ${escapeHtml(
-              formatCurrency(
-                sale.salePrice,
-              ),
-            )}
-                  </td>
-
-                  <td>
-                    ${escapeHtml(
-              formatCurrency(
-                profit,
-              ),
-            )}
-                  </td>
-                </tr>
-              `;
-          })
-          .join('')
-        : devices
+      const sellerRows =
+        commissionSellers
           .map(
-            (device) => `
-                <tr>
-                  <td>
-                    ${escapeHtml(
-              formatDate(
-                device.entryDate,
-              ),
-            )}
-                  </td>
-
-                  <td>
-                    ${escapeHtml(
-              `${device.brand} ${device.model}`,
-            )}
-                  </td>
-
-                  <td>
-                    ${escapeHtml(
-              device.storage,
-            )}
-                  </td>
-
-                  <td>
-                    ${escapeHtml(
-              device.imei,
-            )}
-                  </td>
-
-                  <td>
-                    ${escapeHtml(
-              device.supplier ||
-              'Não informado',
-            )}
-                  </td>
-
-                  <td>
-                    ${escapeHtml(
-              getDeviceConditionLabel(
-                device.condition,
-              ),
-            )}
-                  </td>
-
-                  <td>
-                    ${escapeHtml(
-              getDeviceStatusLabel(
-                device.status,
-              ),
-            )}
-                  </td>
-
-                  <td>
-                    ${escapeHtml(
-              formatCurrency(
-                device.purchasePrice,
-              ),
-            )}
-                  </td>
-
-                  <td>
-                    ${escapeHtml(
-              formatNullableCurrency(
-                device.salePrice,
-              ),
-            )}
-                  </td>
-                </tr>
-              `,
+            (seller) => `
+              <tr>
+                <td>${escapeHtml(seller.sellerName)}</td>
+                <td>${seller.totalSales}</td>
+                <td>${seller.commissionedSales}</td>
+                <td>${escapeHtml(formatCurrency(seller.netRevenue))}</td>
+                <td>${escapeHtml(formatCurrency(seller.totalDiscount))}</td>
+                <td>${escapeHtml(formatCurrency(seller.totalCommission))}</td>
+                <td>${escapeHtml(formatCurrency(seller.profitAfterCommission))}</td>
+              </tr>
+            `,
           )
           .join('');
 
-    const tableHeader =
-      isSalesReport
-        ? `
-          <tr>
-            <th>Data</th>
-            <th>Dispositivo</th>
-            <th>IMEI</th>
-            <th>Comprador</th>
-            <th>Pagamento</th>
-            <th>Compra</th>
-            <th>Venda</th>
-            <th>Lucro</th>
-          </tr>
-        `
-        : `
-          <tr>
-            <th>Entrada</th>
-            <th>Dispositivo</th>
-            <th>Armazenamento</th>
-            <th>IMEI</th>
-            <th>Fornecedor</th>
-            <th>Condição</th>
-            <th>Status</th>
-            <th>Compra</th>
-            <th>Venda</th>
-          </tr>
-        `;
+      const saleRows =
+        commissionSales
+          .map(
+            (sale) => `
+              <tr>
+                <td>${escapeHtml(formatDate(sale.soldAt))}</td>
+                <td>${escapeHtml(sale.sellerName)}</td>
+                <td>${escapeHtml(`${sale.deviceBrand} ${sale.deviceModel}`)}</td>
+                <td>${escapeHtml(sale.customerName)}</td>
+                <td>${escapeHtml(formatCurrency(sale.salePrice))}</td>
+                <td>${escapeHtml(getCommissionRule(sale))}</td>
+                <td>${escapeHtml(formatCurrency(sale.commissionAmount))}</td>
+                <td>${escapeHtml(formatCurrency(sale.profitAfterCommission))}</td>
+              </tr>
+            `,
+          )
+          .join('');
 
-    const printHtml = `
+      tablesHtml = `
+        <h2>Resumo por vendedor</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Vendedor</th>
+              <th>Vendas</th>
+              <th>Comissionadas</th>
+              <th>Faturamento líquido</th>
+              <th>Descontos</th>
+              <th>Comissão</th>
+              <th>Lucro final</th>
+            </tr>
+          </thead>
+          <tbody>${sellerRows}</tbody>
+        </table>
+
+        <h2 class="second-title">Detalhamento das vendas</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Data</th>
+              <th>Vendedor</th>
+              <th>Dispositivo</th>
+              <th>Comprador</th>
+              <th>Valor líquido</th>
+              <th>Regra</th>
+              <th>Comissão</th>
+              <th>Lucro final</th>
+            </tr>
+          </thead>
+          <tbody>${saleRows}</tbody>
+        </table>
+      `;
+    }
+
+    printWindow.document.open();
+    printWindow.document.write(`
       <!DOCTYPE html>
-
       <html lang="pt-BR">
         <head>
           <meta charset="UTF-8" />
-
-          <meta
-            name="viewport"
-            content="width=device-width, initial-scale=1"
-          />
-
-          <title>
-            ${escapeHtml(reportTitle)}
-          </title>
+          <title>${escapeHtml(reportTitle)}</title>
 
           <style>
             @page {
@@ -888,93 +1043,68 @@ export function Reports() {
               box-sizing: border-box;
             }
 
-            html,
             body {
               margin: 0;
-              padding: 0;
-
               color: #111827;
-              background: #ffffff;
-
-              font-family:
-                Arial,
-                Helvetica,
-                sans-serif;
-            }
-
-            body {
-              padding: 4px;
+              font-family: Arial, Helvetica, sans-serif;
             }
 
             header {
               display: flex;
-              align-items: flex-start;
               justify-content: space-between;
-              gap: 24px;
-
-              margin-bottom: 20px;
-              padding-bottom: 14px;
-
-              border-bottom: 2px solid
-                #111827;
+              gap: 20px;
+              margin-bottom: 18px;
+              padding-bottom: 12px;
+              border-bottom: 2px solid #111827;
             }
 
             h1 {
-              margin: 0 0 6px;
-              font-size: 24px;
+              margin: 0 0 5px;
+              font-size: 23px;
+            }
+
+            h2 {
+              margin: 0 0 10px;
+              font-size: 16px;
+            }
+
+            .second-title {
+              margin-top: 22px;
             }
 
             header p {
               margin: 0;
-
               color: #4b5563;
-              font-size: 12px;
+              font-size: 11px;
             }
 
             .store {
               text-align: right;
             }
 
-            .store strong {
-              display: block;
-
-              margin-bottom: 4px;
-              font-size: 16px;
-            }
-
             .summary {
               display: grid;
-              grid-template-columns:
-                repeat(
-                  4,
-                  minmax(0, 1fr)
-                );
-              gap: 10px;
-
-              margin-bottom: 22px;
+              grid-template-columns: repeat(3, 1fr);
+              gap: 8px;
+              margin-bottom: 18px;
             }
 
             .summary article {
               display: flex;
               flex-direction: column;
-              gap: 6px;
-
-              padding: 12px;
-
-              border: 1px solid
-                #d1d5db;
-              border-radius: 8px;
-
-              break-inside: avoid;
+              gap: 5px;
+              padding: 10px;
+              border: 1px solid #d1d5db;
+              border-radius: 6px;
             }
 
             .summary span {
               color: #6b7280;
-              font-size: 11px;
+              font-size: 10px;
             }
 
             .summary strong {
-              font-size: 16px;
+              font-size: 14px;
             }
 
             table {
@@ -992,40 +1122,21 @@ export function Reports() {
 
             th,
             td {
-              padding: 7px;
-
-              border: 1px solid
-                #d1d5db;
-
-              font-size: 9px;
+              padding: 6px;
+              border: 1px solid #d1d5db;
+              font-size: 8px;
               text-align: left;
-              vertical-align: middle;
             }
 
             th {
               background: #f3f4f6;
-
-              font-size: 8px;
               text-transform: uppercase;
-            }
-
-            footer {
-              margin-top: 18px;
-              padding-top: 10px;
-
-              border-top: 1px solid
-                #d1d5db;
-
-              color: #6b7280;
-              font-size: 10px;
-              text-align: center;
             }
 
             @media print {
               body {
                 print-color-adjust: exact;
-                -webkit-print-color-adjust:
-                  exact;
+                -webkit-print-color-adjust: exact;
               }
             }
           </style>
@@ -1034,71 +1145,32 @@ export function Reports() {
         <body>
           <header>
             <div>
-              <h1>
-                ${escapeHtml(
-      reportTitle,
-    )}
-              </h1>
-
-              <p>
-                Dados obtidos de acordo
-                com os filtros aplicados
-                no sistema.
-              </p>
+              <h1>${escapeHtml(reportTitle)}</h1>
+              <p>Dados obtidos conforme os filtros aplicados.</p>
             </div>
 
             <div class="store">
-              <strong>
-                Phone Store
-              </strong>
-
-              <p>
-                Emitido em
-                ${escapeHtml(generatedAt)}
-              </p>
+              <strong>Phone Store</strong>
+              <p>Emitido em ${escapeHtml(generatedAt)}</p>
             </div>
           </header>
 
           ${summaryHtml}
-
-          <table>
-            <thead>
-              ${tableHeader}
-            </thead>
-
-            <tbody>
-              ${tableRows}
-            </tbody>
-          </table>
-
-          <footer>
-            Phone Store — Relatório
-            gerado pelo sistema de
-            gerenciamento
-          </footer>
+          ${tablesHtml}
         </body>
       </html>
-    `;
+    `);
 
-    printWindow.document.open();
-    printWindow.document.write(
-      printHtml,
-    );
     printWindow.document.close();
 
-    const openPrintDialog = () => {
+    window.setTimeout(() => {
       printWindow.focus();
       printWindow.print();
-    };
+    }, 500);
 
     printWindow.onafterprint = () => {
       printWindow.close();
     };
-
-    window.setTimeout(
-      openPrintDialog,
-      600,
-    );
   }
 
   return (
@@ -1108,8 +1180,8 @@ export function Reports() {
           <h1>Relatórios</h1>
 
           <p>
-            Consulte vendas e dispositivos usando
-            filtros específicos.
+            Consulte vendas,
+            dispositivos e comissões.
           </p>
         </div>
       </section>
@@ -1127,7 +1199,7 @@ export function Reports() {
           }
         >
           <BadgeDollarSign size={19} />
-          Relatório de vendas
+          Vendas
         </button>
 
         <button
@@ -1142,7 +1214,25 @@ export function Reports() {
           }
         >
           <Smartphone size={19} />
-          Relatório de dispositivos
+          Dispositivos
+        </button>
+
+        <button
+          type="button"
+          className={
+            activeTab ===
+            'commissions'
+              ? 'reports__tab reports__tab--active'
+              : 'reports__tab'
+          }
+          onClick={() =>
+            handleTabChange(
+              'commissions',
+            )
+          }
+        >
+          <Percent size={19} />
+          Comissões
         </button>
       </section>
 
@@ -1155,7 +1245,7 @@ export function Reports() {
         </div>
       )}
 
-      {activeTab === 'sales' ? (
+      {activeTab === 'sales' && (
         <>
           <section className="reports__filter-card">
             <div className="reports__section-heading">
@@ -1166,9 +1256,8 @@ export function Reports() {
 
                 <p>
                   Pesquise por período,
-                  comprador, IMEI,
-                  dispositivo ou forma de
-                  pagamento.
+                  comprador, vendedor,
+                  dispositivo ou pagamento.
                 </p>
               </div>
 
@@ -1226,6 +1315,45 @@ export function Reports() {
               </label>
 
               <label>
+                <span>Vendedor</span>
+
+                <select
+                  value={
+                    salesFilters.sellerId ??
+                    ''
+                  }
+                  disabled={
+                    isLoadingSellers
+                  }
+                  onChange={(event) =>
+                    setSalesFilters(
+                      (current) => ({
+                        ...current,
+                        sellerId:
+                          event.target
+                            .value,
+                      }),
+                    )
+                  }
+                >
+                  <option value="">
+                    Todos os vendedores
+                  </option>
+
+                  {sellers.map(
+                    (seller) => (
+                      <option
+                        key={seller.id}
+                        value={seller.id}
+                      >
+                        {seller.name}
+                      </option>
+                    ),
+                  )}
+                </select>
+              </label>
+
+              <label>
                 <span>IMEI</span>
 
                 <input
@@ -1249,9 +1377,7 @@ export function Reports() {
               </label>
 
               <label>
-                <span>
-                  Nome do comprador
-                </span>
+                <span>Comprador</span>
 
                 <input
                   type="text"
@@ -1275,9 +1401,7 @@ export function Reports() {
               </label>
 
               <label>
-                <span>
-                  Nome do dispositivo
-                </span>
+                <span>Dispositivo</span>
 
                 <input
                   type="text"
@@ -1301,9 +1425,7 @@ export function Reports() {
               </label>
 
               <label>
-                <span>
-                  Forma de pagamento
-                </span>
+                <span>Pagamento</span>
 
                 <select
                   value={
@@ -1317,33 +1439,26 @@ export function Reports() {
                   }
                 >
                   <option value="TODOS">
-                    Todas
+                    Todas as formas
                   </option>
-
                   <option value="PIX">
                     Pix
                   </option>
-
                   <option value="DINHEIRO">
                     Dinheiro
                   </option>
-
                   <option value="CARTAO_CREDITO">
                     Cartão de crédito
                   </option>
-
                   <option value="CARTAO_DEBITO">
                     Cartão de débito
                   </option>
-
                   <option value="TRANSFERENCIA">
                     Transferência
                   </option>
-
                   <option value="TROCA_DISPOSITIVO">
                     Troca de dispositivo
                   </option>
-
                   <option value="OUTRO">
                     Outro
                   </option>
@@ -1378,201 +1493,197 @@ export function Reports() {
           </section>
 
           <section className="reports__summary">
-            <article className="reports__summary-card">
-              <BadgeDollarSign
-                size={22}
-              />
+            <SummaryCard
+              icon={
+                <BadgeDollarSign
+                  size={22}
+                />
+              }
+              label="Vendas"
+              value={String(
+                displayedSalesMeta.total,
+              )}
+            />
 
-              <div>
-                <span>
-                  Vendas encontradas
-                </span>
+            <SummaryCard
+              icon={
+                <CircleDollarSign
+                  size={22}
+                />
+              }
+              label="Faturamento líquido"
+              value={formatCurrency(
+                displayedSalesMeta
+                  .totalRevenue,
+              )}
+            />
 
-                <strong>
-                  {displayedSalesMeta.total}
-                </strong>
-              </div>
-            </article>
+            <SummaryCard
+              icon={
+                <CircleDollarSign
+                  size={22}
+                />
+              }
+              label="Descontos"
+              value={formatCurrency(
+                displayedSalesMeta
+                  .totalDiscount,
+              )}
+            />
 
-            <article className="reports__summary-card">
-              <CircleDollarSign
-                size={22}
-              />
+            <SummaryCard
+              icon={<Percent size={22} />}
+              label="Comissões"
+              value={formatCurrency(
+                displayedSalesMeta
+                  .totalCommission,
+              )}
+            />
 
-              <div>
-                <span>Faturamento</span>
+            <SummaryCard
+              icon={
+                <PackageCheck
+                  size={22}
+                />
+              }
+              label="Lucro após comissão"
+              value={formatCurrency(
+                displayedSalesMeta
+                  .totalProfitAfterCommission,
+              )}
+            />
 
-                <strong>
-                  {formatCurrency(
-                    displayedSalesMeta
-                      .totalRevenue,
-                  )}
-                </strong>
-              </div>
-            </article>
-
-            <article className="reports__summary-card">
-              <PackageCheck size={22} />
-
-              <div>
-                <span>Lucro</span>
-
-                <strong>
-                  {formatCurrency(
-                    displayedSalesMeta
-                      .totalProfit,
-                  )}
-                </strong>
-              </div>
-            </article>
-
-            <article className="reports__summary-card">
-              <CircleDollarSign
-                size={22}
-              />
-
-              <div>
-                <span>Ticket médio</span>
-
-                <strong>
-                  {formatCurrency(
-                    displayedSalesMeta
-                      .averageTicket,
-                  )}
-                </strong>
-              </div>
-            </article>
+            <SummaryCard
+              icon={
+                <CircleDollarSign
+                  size={22}
+                />
+              }
+              label="Ticket médio"
+              value={formatCurrency(
+                displayedSalesMeta
+                  .averageTicket,
+              )}
+            />
           </section>
 
-          <section className="reports__results">
-            <div className="reports__section-heading">
-              <div>
-                <h2>
-                  Resultado das vendas
-                </h2>
+          <ReportResultsHeader
+            title="Resultado das vendas"
+            description="Vendas encontradas conforme os filtros."
+            onPrint={handlePrintReport}
+            disabled={
+              isLoading ||
+              filteredSales.length === 0
+            }
+          />
 
-                <p>
-                  Registros encontrados
-                  de acordo com os filtros
-                  informados.
-                </p>
-              </div>
-
-              <button
-                type="button"
-                className="reports__print"
-                onClick={
-                  handlePrintReport
-                }
-                disabled={
-                  isLoading ||
-                  filteredSales.length === 0
-                }
-                aria-label="Imprimir relatório de vendas"
-                title="Imprimir relatório"
-              >
-                <Printer size={19} />
-              </button>
-            </div>
-
+          <section className="reports__results reports__results--table-only">
             {isLoading ? (
-              <div className="reports__state">
-                Carregando vendas...
-              </div>
-            ) : filteredSales.length > 0 ? (
+              <ReportState text="Carregando vendas..." />
+            ) : filteredSales.length >
+              0 ? (
               <div className="reports__table-container">
-                <table className="reports__table">
+                <table className="reports__table reports__table--sales">
                   <thead>
                     <tr>
                       <th>Data</th>
+                      <th>Vendedor</th>
                       <th>Dispositivo</th>
-                      <th>IMEI</th>
                       <th>Comprador</th>
                       <th>Pagamento</th>
-                      <th>Valor</th>
-                      <th>Lucro</th>
+                      <th>Bruto</th>
+                      <th>Desconto</th>
+                      <th>Líquido</th>
+                      <th>Comissão</th>
+                      <th>Lucro final</th>
                       <th />
                     </tr>
                   </thead>
 
                   <tbody>
                     {filteredSales.map(
-                      (sale) => {
-                        const profit =
-                          sale.salePrice -
-                          sale.purchasePrice;
+                      (sale) => (
+                        <tr key={sale.id}>
+                          <td>
+                            {formatDate(
+                              sale.soldAt,
+                            )}
+                          </td>
 
-                        return (
-                          <tr key={sale.id}>
-                            <td>
-                              {formatDate(
-                                sale.soldAt,
-                              )}
-                            </td>
+                          <td>
+                            {sale.sellerName}
+                          </td>
 
-                            <td>
-                              <strong>
-                                {
-                                  sale.deviceBrand
-                                }{' '}
-                                {
-                                  sale.deviceModel
-                                }
-                              </strong>
-                            </td>
+                          <td>
+                            <strong>
+                              {sale.deviceBrand}{' '}
+                              {sale.deviceModel}
+                            </strong>
+                          </td>
 
-                            <td>
-                              {
-                                sale.deviceImei
-                              }
-                            </td>
+                          <td>
+                            {sale.customerName}
+                          </td>
 
-                            <td>
-                              {
-                                sale.customerName
-                              }
-                            </td>
+                          <td>
+                            {getPaymentSummary(
+                              sale,
+                            )}
+                          </td>
 
-                            <td>
-                              {getPaymentSummary(
-                                sale,
-                              )}
-                            </td>
+                          <td>
+                            {formatCurrency(
+                              sale.grossSalePrice,
+                            )}
+                          </td>
 
-                            <td>
-                              {formatCurrency(
-                                sale.salePrice,
-                              )}
-                            </td>
+                          <td>
+                            {formatCurrency(
+                              sale.discountAmount,
+                            )}
+                          </td>
 
-                            <td>
-                              {formatCurrency(
-                                profit,
-                              )}
-                            </td>
+                          <td>
+                            {formatCurrency(
+                              sale.salePrice,
+                            )}
+                          </td>
 
-                            <td>
-                              <Link
-                                to={`/vendas/${sale.id}`}
-                              >
-                                Detalhes
-                              </Link>
-                            </td>
-                          </tr>
-                        );
-                      },
+                          <td>
+                            {formatCurrency(
+                              sale.commissionAmount,
+                            )}
+                          </td>
+
+                          <td>
+                            {formatCurrency(
+                              sale.salePrice -
+                                sale.purchasePrice -
+                                sale.commissionAmount,
+                            )}
+                          </td>
+
+                          <td>
+                            <Link
+                              to={`/vendas/${sale.id}`}
+                            >
+                              Detalhes
+                            </Link>
+                          </td>
+                        </tr>
+                      ),
                     )}
                   </tbody>
                 </table>
               </div>
             ) : (
-              <div className="reports__state">
-                Nenhuma venda encontrada.
-              </div>
+              <ReportState text="Nenhuma venda encontrada." />
             )}
           </section>
         </>
-      ) : (
+      )}
+
+      {activeTab === 'devices' && (
         <>
           <section className="reports__filter-card">
             <div className="reports__section-heading">
@@ -1691,9 +1802,7 @@ export function Reports() {
               </label>
 
               <label>
-                <span>
-                  Nome do dispositivo
-                </span>
+                <span>Dispositivo</span>
 
                 <input
                   type="text"
@@ -1732,8 +1841,8 @@ export function Reports() {
                         status:
                           event.target.value
                             ? (event
-                              .target
-                              .value as Device['status'])
+                                .target
+                                .value as Device['status'])
                             : undefined,
                       }),
                     )
@@ -1743,16 +1852,14 @@ export function Reports() {
                     Todos
                   </option>
                   <option value="PENDENTE_INFORMACOES">
-                    Pendente de informações
+                    Pendente
                   </option>
                   <option value="DISPONIVEL">
                     Disponível
                   </option>
-
                   <option value="RESERVADO">
                     Reservado
                   </option>
-
                   <option value="VENDIDO">
                     Vendido
                   </option>
@@ -1787,106 +1894,93 @@ export function Reports() {
           </section>
 
           <section className="reports__summary">
-            <article className="reports__summary-card">
-              <Smartphone size={22} />
+            <SummaryCard
+              icon={
+                <Smartphone size={22} />
+              }
+              label="Dispositivos"
+              value={String(
+                devicesMeta.total,
+              )}
+            />
 
-              <div>
-                <span>
-                  Dispositivos encontrados
-                </span>
+            <SummaryCard
+              icon={
+                <Smartphone size={22} />
+              }
+              label="Pendentes"
+              value={String(
+                devicesMeta.pending,
+              )}
+            />
 
-                <strong>
-                  {devicesMeta.total}
-                </strong>
-              </div>
-            </article>
+            <SummaryCard
+              icon={
+                <PackageCheck
+                  size={22}
+                />
+              }
+              label="Disponíveis"
+              value={String(
+                devicesMeta.available,
+              )}
+            />
 
-            <article className="reports__summary-card">
-              <PackageCheck size={22} />
+            <SummaryCard
+              icon={
+                <BadgeDollarSign
+                  size={22}
+                />
+              }
+              label="Vendidos"
+              value={String(
+                devicesMeta.sold,
+              )}
+            />
 
-              <div>
-                <span>Disponíveis</span>
+            <SummaryCard
+              icon={
+                <CircleDollarSign
+                  size={22}
+                />
+              }
+              label="Valor potencial"
+              value={formatCurrency(
+                devicesMeta
+                  .totalSaleValue,
+              )}
+            />
 
-                <strong>
-                  {
-                    devicesMeta.available
-                  }
-                </strong>
-              </div>
-            </article>
-
-            <article className="reports__summary-card">
-              <BadgeDollarSign
-                size={22}
-              />
-
-              <div>
-                <span>Vendidos</span>
-
-                <strong>
-                  {devicesMeta.sold}
-                </strong>
-              </div>
-            </article>
-
-            <article className="reports__summary-card">
-              <CircleDollarSign
-                size={22}
-              />
-
-              <div>
-                <span>
-                  Valor potencial
-                </span>
-
-                <strong>
-                  {formatCurrency(
-                    devicesMeta
-                      .totalSaleValue,
-                  )}
-                </strong>
-              </div>
-            </article>
+            <SummaryCard
+              icon={
+                <CircleDollarSign
+                  size={22}
+                />
+              }
+              label="Lucro potencial"
+              value={formatCurrency(
+                devicesMeta
+                  .potentialProfit,
+              )}
+            />
           </section>
 
-          <section className="reports__results">
-            <div className="reports__section-heading">
-              <div>
-                <h2>
-                  Resultado dos dispositivos
-                </h2>
+          <ReportResultsHeader
+            title="Resultado dos dispositivos"
+            description="Dispositivos encontrados conforme os filtros."
+            onPrint={handlePrintReport}
+            disabled={
+              isLoading ||
+              devices.length === 0
+            }
+          />
 
-                <p>
-                  Registros encontrados
-                  de acordo com os filtros
-                  informados.
-                </p>
-              </div>
-
-              <button
-                type="button"
-                className="reports__print"
-                onClick={
-                  handlePrintReport
-                }
-                disabled={
-                  isLoading ||
-                  devices.length === 0
-                }
-                aria-label="Imprimir relatório de dispositivos"
-                title="Imprimir relatório"
-              >
-                <Printer size={19} />
-              </button>
-            </div>
-
+          <section className="reports__results reports__results--table-only">
             {isLoading ? (
-              <div className="reports__state">
-                Carregando dispositivos...
-              </div>
+              <ReportState text="Carregando dispositivos..." />
             ) : devices.length > 0 ? (
               <div className="reports__table-container">
-                <table className="reports__table">
+                <table className="reports__table reports__table--devices">
                   <thead>
                     <tr>
                       <th>Entrada</th>
@@ -1895,7 +1989,8 @@ export function Reports() {
                       <th>Fornecedor</th>
                       <th>Condição</th>
                       <th>Status</th>
-                      <th>Valor</th>
+                      <th>Compra</th>
+                      <th>Venda</th>
                       <th />
                     </tr>
                   </thead>
@@ -1903,11 +1998,7 @@ export function Reports() {
                   <tbody>
                     {devices.map(
                       (device) => (
-                        <tr
-                          key={
-                            device.id
-                          }
-                        >
+                        <tr key={device.id}>
                           <td>
                             {formatDate(
                               device.entryDate,
@@ -1916,17 +2007,14 @@ export function Reports() {
 
                           <td>
                             <strong>
-                              {
-                                device.brand
-                              }{' '}
-                              {
-                                device.model
-                              }
+                              {device.brand}{' '}
+                              {device.model}
                             </strong>
                           </td>
 
                           <td>
-                            {device.imei}
+                            {device.imei ||
+                              'Não informado'}
                           </td>
 
                           <td>
@@ -1951,6 +2039,12 @@ export function Reports() {
                           </td>
 
                           <td>
+                            {formatCurrency(
+                              device.purchasePrice,
+                            )}
+                          </td>
+
+                          <td>
                             {formatNullableCurrency(
                               device.salePrice,
                             )}
@@ -1970,13 +2064,555 @@ export function Reports() {
                 </table>
               </div>
             ) : (
-              <div className="reports__state">
-                Nenhum dispositivo encontrado.
+              <ReportState text="Nenhum dispositivo encontrado." />
+            )}
+          </section>
+        </>
+      )}
+
+      {activeTab ===
+        'commissions' && (
+        <>
+          <section className="reports__filter-card">
+            <div className="reports__section-heading">
+              <div>
+                <h2>
+                  Filtros de comissões
+                </h2>
+
+                <p>
+                  Consulte as comissões
+                  por período e vendedor.
+                </p>
               </div>
+
+              <Percent size={22} />
+            </div>
+
+            <form
+              className="reports__filters reports__filters--commissions"
+              onSubmit={
+                handleCommissionsSubmit
+              }
+            >
+              <label>
+                <span>Data inicial</span>
+
+                <input
+                  type="date"
+                  value={
+                    commissionsFilters
+                      .startDate ?? ''
+                  }
+                  onChange={(event) =>
+                    setCommissionsFilters(
+                      (current) => ({
+                        ...current,
+                        startDate:
+                          event.target
+                            .value,
+                      }),
+                    )
+                  }
+                />
+              </label>
+
+              <label>
+                <span>Data final</span>
+
+                <input
+                  type="date"
+                  value={
+                    commissionsFilters
+                      .endDate ?? ''
+                  }
+                  onChange={(event) =>
+                    setCommissionsFilters(
+                      (current) => ({
+                        ...current,
+                        endDate:
+                          event.target
+                            .value,
+                      }),
+                    )
+                  }
+                />
+              </label>
+
+              <label>
+                <span>Vendedor</span>
+
+                <select
+                  value={
+                    commissionsFilters
+                      .sellerId ?? ''
+                  }
+                  disabled={
+                    isLoadingSellers
+                  }
+                  onChange={(event) =>
+                    setCommissionsFilters(
+                      (current) => ({
+                        ...current,
+                        sellerId:
+                          event.target
+                            .value,
+                      }),
+                    )
+                  }
+                >
+                  <option value="">
+                    Todos os vendedores
+                  </option>
+
+                  {sellers.map(
+                    (seller) => (
+                      <option
+                        key={seller.id}
+                        value={seller.id}
+                      >
+                        {seller.name}
+                      </option>
+                    ),
+                  )}
+                </select>
+              </label>
+
+              <div className="reports__filter-actions">
+                <button
+                  type="button"
+                  className="reports__clear"
+                  onClick={
+                    handleClearCommissionsFilters
+                  }
+                >
+                  <RotateCcw size={17} />
+                  Limpar
+                </button>
+
+                <button
+                  type="submit"
+                  className="reports__search"
+                  disabled={isLoading}
+                >
+                  <Search size={17} />
+
+                  {isLoading
+                    ? 'Pesquisando...'
+                    : 'Pesquisar'}
+                </button>
+              </div>
+            </form>
+          </section>
+
+          <section className="reports__summary">
+            <SummaryCard
+              icon={
+                <BadgeDollarSign
+                  size={22}
+                />
+              }
+              label="Vendas"
+              value={String(
+                commissionsMeta
+                  .totalSales,
+              )}
+            />
+
+            <SummaryCard
+              icon={<Percent size={22} />}
+              label="Vendas com comissão"
+              value={String(
+                commissionsMeta
+                  .commissionedSales,
+              )}
+            />
+
+            <SummaryCard
+              icon={<Users size={22} />}
+              label="Vendedores"
+              value={String(
+                commissionsMeta
+                  .totalSellers,
+              )}
+            />
+
+            <SummaryCard
+              icon={
+                <CircleDollarSign
+                  size={22}
+                />
+              }
+              label="Faturamento líquido"
+              value={formatCurrency(
+                commissionsMeta
+                  .totalNetRevenue,
+              )}
+            />
+
+            <SummaryCard
+              icon={
+                <CircleDollarSign
+                  size={22}
+                />
+              }
+              label="Descontos"
+              value={formatCurrency(
+                commissionsMeta
+                  .totalDiscount,
+              )}
+            />
+
+            <SummaryCard
+              icon={<Percent size={22} />}
+              label="Comissões"
+              value={formatCurrency(
+                commissionsMeta
+                  .totalCommission,
+              )}
+            />
+
+            <SummaryCard
+              icon={
+                <PackageCheck
+                  size={22}
+                />
+              }
+              label="Lucro após comissão"
+              value={formatCurrency(
+                commissionsMeta
+                  .totalProfitAfterCommission,
+              )}
+            />
+
+            <SummaryCard
+              icon={
+                <CircleDollarSign
+                  size={22}
+                />
+              }
+              label="Comissão média"
+              value={formatCurrency(
+                commissionsMeta
+                  .averageCommission,
+              )}
+            />
+          </section>
+
+          <section className="reports__results">
+            <div className="reports__section-heading">
+              <div>
+                <h2>
+                  Resumo por vendedor
+                </h2>
+
+                <p>
+                  Totais consolidados de
+                  cada funcionário.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                className="reports__print"
+                onClick={
+                  handlePrintReport
+                }
+                disabled={
+                  isLoading ||
+                  commissionSales.length ===
+                    0
+                }
+                aria-label="Imprimir relatório de comissões"
+                title="Imprimir relatório"
+              >
+                <Printer size={19} />
+              </button>
+            </div>
+
+            {isLoading ? (
+              <ReportState text="Carregando comissões..." />
+            ) : commissionSellers.length >
+              0 ? (
+              <div className="reports__table-container">
+                <table className="reports__table reports__table--commission-summary">
+                  <thead>
+                    <tr>
+                      <th>Vendedor</th>
+                      <th>Vendas</th>
+                      <th>Comissionadas</th>
+                      <th>Faturamento líquido</th>
+                      <th>Descontos</th>
+                      <th>Comissão</th>
+                      <th>Comissão média</th>
+                      <th>Lucro final</th>
+                    </tr>
+                  </thead>
+
+                  <tbody>
+                    {commissionSellers.map(
+                      (seller) => (
+                        <tr
+                          key={
+                            seller.sellerId ??
+                            seller.sellerName
+                          }
+                        >
+                          <td>
+                            <strong>
+                              {seller.sellerName}
+                            </strong>
+                          </td>
+
+                          <td>
+                            {seller.totalSales}
+                          </td>
+
+                          <td>
+                            {
+                              seller.commissionedSales
+                            }
+                          </td>
+
+                          <td>
+                            {formatCurrency(
+                              seller.netRevenue,
+                            )}
+                          </td>
+
+                          <td>
+                            {formatCurrency(
+                              seller.totalDiscount,
+                            )}
+                          </td>
+
+                          <td>
+                            <strong className="reports__commission-value">
+                              {formatCurrency(
+                                seller.totalCommission,
+                              )}
+                            </strong>
+                          </td>
+
+                          <td>
+                            {formatCurrency(
+                              seller.averageCommission,
+                            )}
+                          </td>
+
+                          <td>
+                            {formatCurrency(
+                              seller.profitAfterCommission,
+                            )}
+                          </td>
+                        </tr>
+                      ),
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <ReportState text="Nenhuma comissão encontrada." />
+            )}
+          </section>
+
+          <section className="reports__results">
+            <div className="reports__section-heading">
+              <div>
+                <h2>
+                  Detalhamento das
+                  comissões
+                </h2>
+
+                <p>
+                  Vendas usadas no cálculo
+                  de cada comissão.
+                </p>
+              </div>
+            </div>
+
+            {isLoading ? (
+              <ReportState text="Carregando vendas..." />
+            ) : commissionSales.length >
+              0 ? (
+              <div className="reports__table-container">
+                <table className="reports__table reports__table--commission-details">
+                  <thead>
+                    <tr>
+                      <th>Data</th>
+                      <th>Vendedor</th>
+                      <th>Dispositivo</th>
+                      <th>Comprador</th>
+                      <th>Bruto</th>
+                      <th>Desconto</th>
+                      <th>Líquido</th>
+                      <th>Tipo</th>
+                      <th>Regra</th>
+                      <th>Comissão</th>
+                      <th>Lucro final</th>
+                      <th />
+                    </tr>
+                  </thead>
+
+                  <tbody>
+                    {commissionSales.map(
+                      (sale) => (
+                        <tr key={sale.id}>
+                          <td>
+                            {formatDate(
+                              sale.soldAt,
+                            )}
+                          </td>
+
+                          <td>
+                            {sale.sellerName}
+                          </td>
+
+                          <td>
+                            <strong>
+                              {sale.deviceBrand}{' '}
+                              {sale.deviceModel}
+                            </strong>
+                          </td>
+
+                          <td>
+                            {sale.customerName}
+                          </td>
+
+                          <td>
+                            {formatCurrency(
+                              sale.grossSalePrice,
+                            )}
+                          </td>
+
+                          <td>
+                            {formatCurrency(
+                              sale.discountAmount,
+                            )}
+                          </td>
+
+                          <td>
+                            {formatCurrency(
+                              sale.salePrice,
+                            )}
+                          </td>
+
+                          <td>
+                            {getCommissionTypeLabel(
+                              sale.commissionType,
+                            )}
+                          </td>
+
+                          <td>
+                            {getCommissionRule(
+                              sale,
+                            )}
+                          </td>
+
+                          <td>
+                            <strong className="reports__commission-value">
+                              {formatCurrency(
+                                sale.commissionAmount,
+                              )}
+                            </strong>
+                          </td>
+
+                          <td>
+                            {formatCurrency(
+                              sale.profitAfterCommission,
+                            )}
+                          </td>
+
+                          <td>
+                            <Link
+                              to={`/vendas/${sale.id}`}
+                            >
+                              Detalhes
+                            </Link>
+                          </td>
+                        </tr>
+                      ),
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <ReportState text="Nenhuma venda com comissão encontrada." />
             )}
           </section>
         </>
       )}
     </main>
+  );
+}
+
+interface SummaryCardProps {
+  icon: ReactNode;
+  label: string;
+  value: string;
+}
+
+function SummaryCard({
+  icon,
+  label,
+  value,
+}: SummaryCardProps) {
+  return (
+    <article className="reports__summary-card">
+      {icon}
+
+      <div>
+        <span>{label}</span>
+        <strong>{value}</strong>
+      </div>
+    </article>
+  );
+}
+
+interface ReportResultsHeaderProps {
+  title: string;
+  description: string;
+  onPrint: () => void;
+  disabled: boolean;
+}
+
+function ReportResultsHeader({
+  title,
+  description,
+  onPrint,
+  disabled,
+}: ReportResultsHeaderProps) {
+  return (
+    <section className="reports__results reports__results--heading-only">
+      <div className="reports__section-heading">
+        <div>
+          <h2>{title}</h2>
+          <p>{description}</p>
+        </div>
+
+        <button
+          type="button"
+          className="reports__print"
+          onClick={onPrint}
+          disabled={disabled}
+          aria-label={`Imprimir ${title.toLowerCase()}`}
+          title="Imprimir relatório"
+        >
+          <Printer size={19} />
+        </button>
+      </div>
+    </section>
+  );
+}
+
+function ReportState({
+  text,
+}: {
+  text: string;
+}) {
+  return (
+    <div className="reports__state">
+      {text}
+    </div>
   );
 }

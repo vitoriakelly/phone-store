@@ -1,4 +1,6 @@
 import type {
+  CommissionsReportFilters,
+  CommissionsReportResponse,
   DevicesReportFilters,
   DevicesReportResponse,
   SalesReportFilters,
@@ -49,6 +51,7 @@ export async function getSalesReport(
       customerName:
         filters.customerName,
       deviceName: filters.deviceName,
+      sellerId: filters.sellerId,
     });
 
   return apiRequest<SalesReportResponse>(
@@ -71,5 +74,20 @@ export async function getDevicesReport(
 
   return apiRequest<DevicesReportResponse>(
     `/reports/devices${queryString}`,
+  );
+}
+
+export async function getCommissionsReport(
+  filters: CommissionsReportFilters = {},
+): Promise<CommissionsReportResponse> {
+  const queryString =
+    createQueryParams({
+      startDate: filters.startDate,
+      endDate: filters.endDate,
+      sellerId: filters.sellerId,
+    });
+
+  return apiRequest<CommissionsReportResponse>(
+    `/reports/commissions${queryString}`,
   );
 }
