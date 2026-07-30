@@ -5,6 +5,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react';
 
@@ -24,9 +25,12 @@ interface AuthContextValue {
   isAuthenticated: boolean;
   isMaster: boolean;
   isLoading: boolean;
+  isLoggingOut: boolean;
+
   login: (
     input: LoginInput,
   ) => Promise<AuthUser>;
+
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
 }
@@ -48,6 +52,14 @@ export function AuthProvider({
 
   const [isLoading, setIsLoading] =
     useState(true);
+
+  const [
+    isLoggingOut,
+    setIsLoggingOut,
+  ] = useState(false);
+
+  const logoutInProgressRef =
+    useRef(false);
 
   const refreshUser =
     useCallback(async () => {
@@ -135,42 +147,92 @@ export function AuthProvider({
 
   const logout = useCallback(
     async () => {
+      /*
+       * Impede dois cliques rápidos de
+       * enviarem duas requisições.
+       */
+      if (
+        logoutInProgressRef.current
+      ) {
+        return;
+      }
+
+      logoutInProgressRef.current =
+        true;
+
+      setIsLoggingOut(true);
+
       try {
+        /*
+         * O backend incrementa
+         * tokenVersion e apaga o cookie.
+         */
         await logoutRequest();
-      } finally {
+
         setUser(null);
+      } catch (error) {
+        /*
+         * Um 401 significa que o token
+         * já estava expirado, inválido
+         * ou foi encerrado anteriormente.
+         */
+        if (
+          error instanceof ApiError &&
+          error.status === 401
+        ) {
+          setUser(null);
+          return;
+        }
+
+        /*
+         * Em erros internos ou de rede,
+         * não fingimos que o logout foi
+         * concluído. A sidebar poderá
+         * mostrar a mensagem do erro.
+         */
+        throw error;
+      } finally {
+        logoutInProgressRef.current =
+          false;
+
+        setIsLoggingOut(false);
       }
     },
     [],
   );
 
-  const value = useMemo<AuthContextValue>(
-    () => ({
-      user,
+  const value =
+    useMemo<AuthContextValue>(
+      () => ({
+        user,
 
-      isAuthenticated:
-        user !== null,
+        isAuthenticated:
+          user !== null,
 
-      isMaster:
-        user?.role === 'MASTER',
+        isMaster:
+          user?.role === 'MASTER',
 
-      isLoading,
+        isLoading,
+        isLoggingOut,
 
-      login,
-      logout,
-      refreshUser,
-    }),
-    [
-      user,
-      isLoading,
-      login,
-      logout,
-      refreshUser,
-    ],
-  );
+        login,
+        logout,
+        refreshUser,
+      }),
+      [
+        user,
+        isLoading,
+        isLoggingOut,
+        login,
+        logout,
+        refreshUser,
+      ],
+    );
 
   return (
-    <AuthContext.Provider value={value}>
+    <AuthContext.Provider
+      value={value}
+    >
       {children}
     </AuthContext.Provider>
   );

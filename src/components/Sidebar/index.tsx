@@ -2,14 +2,17 @@ import {
   BadgeDollarSign,
   FileBarChart2,
   LayoutDashboard,
+  LogOut,
   PlusCircle,
   Smartphone,
   Users,
   X,
 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { NavLink } from 'react-router-dom';
 
 import { useAuth } from '../../contexts/AuthContext';
+import { ApiError } from '../../services/api';
 
 import './styles.scss';
 
@@ -22,7 +25,37 @@ export function Sidebar({
   isOpen,
   onClose,
 }: SidebarProps) {
-  const { isMaster } = useAuth();
+  const navigate = useNavigate();
+
+  const {
+    isMaster,
+    logout,
+    isLoggingOut,
+  } = useAuth();
+
+  async function handleLogout() {
+    try {
+      /*
+       * O backend invalida o token
+       * antes de o usuário ser removido
+       * do AuthContext.
+       */
+      await logout();
+
+      onClose();
+
+      navigate('/login', {
+        replace: true,
+      });
+    } catch (error) {
+      const message =
+        error instanceof ApiError
+          ? error.message
+          : 'Não foi possível encerrar a sessão. Tente novamente.';
+
+      window.alert(message);
+    }
+  }
 
   return (
     <aside
@@ -64,6 +97,7 @@ export function Sidebar({
           }
         >
           <LayoutDashboard size={20} />
+
           <span>Dashboard</span>
         </NavLink>
 
@@ -79,6 +113,7 @@ export function Sidebar({
           }
         >
           <Smartphone size={20} />
+
           <span>Dispositivos</span>
         </NavLink>
 
@@ -94,6 +129,7 @@ export function Sidebar({
           }
         >
           <PlusCircle size={20} />
+
           <span>Novo dispositivo</span>
         </NavLink>
 
@@ -109,6 +145,7 @@ export function Sidebar({
           }
         >
           <BadgeDollarSign size={20} />
+
           <span>Vendas</span>
         </NavLink>
 
@@ -117,7 +154,9 @@ export function Sidebar({
             <NavLink
               to="/relatorios"
               onClick={onClose}
-              className={({ isActive }) =>
+              className={({
+                isActive,
+              }) =>
                 `sidebar__link ${
                   isActive
                     ? 'sidebar__link--active'
@@ -125,14 +164,19 @@ export function Sidebar({
                 }`
               }
             >
-              <FileBarChart2 size={20} />
+              <FileBarChart2
+                size={20}
+              />
+
               <span>Relatórios</span>
             </NavLink>
 
             <NavLink
               to="/funcionarios"
               onClick={onClose}
-              className={({ isActive }) =>
+              className={({
+                isActive,
+              }) =>
                 `sidebar__link ${
                   isActive
                     ? 'sidebar__link--active'
@@ -141,10 +185,30 @@ export function Sidebar({
               }
             >
               <Users size={20} />
+
               <span>Funcionários</span>
             </NavLink>
           </>
         )}
+
+        <div className="sidebar__logout-container">
+          <button
+            type="button"
+            className="sidebar__logout"
+            onClick={() =>
+              void handleLogout()
+            }
+            disabled={isLoggingOut}
+          >
+            <LogOut size={20} />
+
+            <span>
+              {isLoggingOut
+                ? 'Saindo...'
+                : 'Sair'}
+            </span>
+          </button>
+        </div>
       </nav>
 
       <footer className="sidebar__footer">

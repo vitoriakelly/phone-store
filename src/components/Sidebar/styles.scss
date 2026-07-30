@@ -45,6 +45,7 @@
 
     span {
       margin-top: 2px;
+
       color: #9ca3af;
       font-size: 12px;
     }
@@ -60,6 +61,8 @@
 
     color: #ffffff;
     background: transparent;
+
+    cursor: pointer;
   }
 
   &__navigation {
@@ -76,6 +79,7 @@
     align-items: center;
     gap: 12px;
 
+    min-height: 44px;
     padding: 12px 14px;
     border-radius: 8px;
 
@@ -100,6 +104,64 @@
     }
   }
 
+  &__logout-container {
+    margin-top: 8px;
+    padding-top: 16px;
+    border-top: 1px solid #374151;
+  }
+
+  &__logout {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+
+    width: 100%;
+    min-height: 44px;
+    padding: 12px 14px;
+    border: 1px solid transparent;
+    border-radius: 8px;
+
+    color: #fca5a5;
+    background-color: transparent;
+
+    font: inherit;
+    font-size: 16px;
+    text-align: left;
+
+    cursor: pointer;
+
+    transition:
+      color 0.2s,
+      border-color 0.2s,
+      background-color 0.2s;
+
+    &:hover:not(:disabled) {
+      border-color: rgb(
+        239 68 68 / 25%
+      );
+
+      color: #ffffff;
+      background-color: rgb(
+        127 29 29 / 45%
+      );
+    }
+
+    &:focus-visible {
+      outline: 3px solid
+        rgb(239 68 68 / 25%);
+      outline-offset: 2px;
+    }
+
+    &:disabled {
+      cursor: not-allowed;
+      opacity: 0.6;
+    }
+
+    svg {
+      flex-shrink: 0;
+    }
+  }
+
   &__footer {
     padding: 16px 8px 0;
     border-top: 1px solid #374151;
@@ -119,6 +181,7 @@
 @media (max-width: 768px) {
   .sidebar {
     width: 280px;
+
     transform: translateX(-100%);
 
     &--open {
