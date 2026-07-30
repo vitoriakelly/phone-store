@@ -214,6 +214,17 @@ const tradeInDeviceSchema = z.object({
 
 export const saleSchema = z
   .object({
+    sellerId: z
+      .string()
+      .trim()
+      .min(
+        1,
+        'Selecione o vendedor responsável pela venda.',
+      )
+      .uuid(
+        'O identificador do vendedor é inválido.',
+      ),
+
     customerName: z
       .string()
       .trim()

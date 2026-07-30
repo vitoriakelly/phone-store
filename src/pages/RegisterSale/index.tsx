@@ -32,11 +32,13 @@ import {
 import { ApiError } from '../../services/api';
 import { getDeviceById } from '../../services/deviceApi';
 import { createSale } from '../../services/saleApi';
+import { listSellers } from '../../services/userApi';
 import type { Device } from '../../types/device';
 import type {
   PaymentMethod,
   TradeInDeviceInput,
 } from '../../types/sale';
+import type { Seller } from '../../types/user';
 import { formatCurrency } from '../../utils/currency';
 
 import './styles.scss';
@@ -144,6 +146,19 @@ export function RegisterSale() {
   const [device, setDevice] =
     useState<Device | null>(null);
 
+  const [sellers, setSellers] =
+    useState<Seller[]>([]);
+
+  const [
+    isLoadingSellers,
+    setIsLoadingSellers,
+  ] = useState(true);
+
+  const [
+    sellersLoadError,
+    setSellersLoadError,
+  ] = useState('');
+
   const [isLoading, setIsLoading] =
     useState(true);
 
@@ -181,6 +196,8 @@ export function RegisterSale() {
     shouldUnregister: true,
 
     defaultValues: {
+      sellerId: '',
+
       customerName: '',
       customerPhone: '',
 
@@ -289,6 +306,52 @@ export function RegisterSale() {
   useEffect(() => {
     let isMounted = true;
 
+    async function loadSellers() {
+      setIsLoadingSellers(true);
+      setSellersLoadError('');
+
+      try {
+        const activeSellers =
+          await listSellers();
+
+        if (!isMounted) {
+          return;
+        }
+
+        setSellers(activeSellers);
+      } catch (error) {
+        if (!isMounted) {
+          return;
+        }
+
+        setSellers([]);
+
+        if (error instanceof ApiError) {
+          setSellersLoadError(
+            error.message,
+          );
+        } else {
+          setSellersLoadError(
+            'Não foi possível carregar os vendedores.',
+          );
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoadingSellers(false);
+        }
+      }
+    }
+
+    void loadSellers();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let isMounted = true;
+
     async function loadDevice() {
       if (!id) {
         if (isMounted) {
@@ -322,6 +385,8 @@ export function RegisterSale() {
           apiDevice.salePrice ?? 0;
 
         reset({
+          sellerId: '',
+
           customerName: '',
           customerPhone: '',
 
@@ -597,6 +662,7 @@ export function RegisterSale() {
     try {
       await createSale({
         deviceId: device.id,
+        sellerId: data.sellerId,
 
         customerName:
           data.customerName.trim(),
@@ -1190,13 +1256,62 @@ export function RegisterSale() {
               </h2>
 
               <p>
-                Valor final e data da
+                Vendedor responsável,
+                valor final e data da
                 negociação.
               </p>
             </div>
           </div>
 
           <div className="register-sale__grid">
+            <div className="register-sale__field">
+              <label htmlFor="sellerId">
+                Vendedor *
+              </label>
+
+              <select
+                id="sellerId"
+                disabled={
+                  isLoadingSellers ||
+                  sellers.length === 0
+                }
+                {...register('sellerId')}
+              >
+                <option value="">
+                  {isLoadingSellers
+                    ? 'Carregando vendedores...'
+                    : sellers.length === 0
+                      ? 'Nenhum vendedor disponível'
+                      : 'Selecione o vendedor'}
+                </option>
+
+                {sellers.map((seller) => (
+                  <option
+                    key={seller.id}
+                    value={seller.id}
+                  >
+                    {seller.name}
+                    {' · '}
+                    {seller.role === 'MASTER'
+                      ? 'Master'
+                      : 'Funcionário'}
+                  </option>
+                ))}
+              </select>
+
+              {errors.sellerId && (
+                <span className="register-sale__error">
+                  {errors.sellerId.message}
+                </span>
+              )}
+
+              {sellersLoadError && (
+                <span className="register-sale__error">
+                  {sellersLoadError}
+                </span>
+              )}
+            </div>
+
             <div className="register-sale__field">
               <label htmlFor="salePrice">
                 Valor final da venda *
@@ -2081,6 +2196,8 @@ export function RegisterSale() {
             className="register-sale__submit"
             disabled={
               isSubmitting ||
+              isLoadingSellers ||
+              sellers.length === 0 ||
               !paymentTotalIsValid
             }
           >

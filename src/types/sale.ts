@@ -63,6 +63,7 @@ export interface TradeInDeviceInput {
 
 export interface CreateSaleInput {
   deviceId: string;
+  sellerId: string;
 
   customerName: string;
   customerPhone?: string | null;
@@ -86,6 +87,9 @@ export interface Sale {
   id: string;
   deviceId: string;
   tradeInDeviceId: string | null;
+
+  sellerId: string | null;
+  sellerName: string;
 
   deviceBrand: string;
   deviceModel: string;

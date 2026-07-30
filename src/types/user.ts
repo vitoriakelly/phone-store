@@ -1,3 +1,13 @@
+export type UserRole =
+  | 'MASTER'
+  | 'FUNCIONARIO';
+
+export interface Seller {
+  id: string;
+  name: string;
+  role: UserRole;
+}
+
 export interface Employee {
   id: string;
   name: string;
@@ -21,6 +31,12 @@ export interface UpdateEmployeeStatusInput {
 
 export interface ResetEmployeePasswordInput {
   password: string;
+}
+
+export interface SellersResponse {
+  data: {
+    sellers: Seller[];
+  };
 }
 
 export interface EmployeesResponse {

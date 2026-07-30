@@ -6,8 +6,21 @@ import type {
   EmployeeResponse,
   EmployeesResponse,
   ResetEmployeePasswordInput,
+  Seller,
+  SellersResponse,
   UpdateEmployeeStatusInput,
 } from '../types/user';
+
+export async function listSellers(): Promise<
+  Seller[]
+> {
+  const response =
+    await apiRequest<SellersResponse>(
+      '/users/employees/sellers',
+    );
+
+  return response.data.sellers;
+}
 
 export async function listEmployees(): Promise<
   Employee[]
