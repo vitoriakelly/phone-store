@@ -100,7 +100,7 @@ export function Login() {
         setFormError(error.message);
       } else {
         setFormError(
-          'Não foi possível realizar o login. Verifique se a API está funcionando.',
+          'Não foi possível acessar o sistema. Verifique se a API está funcionando.',
         );
       }
     } finally {
@@ -129,58 +129,51 @@ export function Login() {
 
   return (
     <main className="login">
-      <section className="login__presentation">
+      <aside className="login__brand-area">
         <div className="login__brand">
           <div className="login__brand-icon">
-            <Smartphone size={30} />
+            <Smartphone size={27} />
           </div>
 
           <div>
             <strong>Phone Store</strong>
-            <span>
-              Sistema de gerenciamento
-            </span>
+            <span>Gestão de dispositivos</span>
           </div>
         </div>
 
-        <div className="login__presentation-content">
-          <span className="login__eyebrow">
-            Gestão simples e organizada
-          </span>
-
+        <div className="login__brand-content">
           <h1>
-            Controle seu estoque e suas vendas em
-            um só lugar.
+            Sua loja organizada em um só lugar.
           </h1>
 
           <p>
-            Consulte dispositivos, registre vendas
-            e acompanhe os resultados da loja com
-            segurança.
+            Controle dispositivos, vendas e acessos
+            com simplicidade.
           </p>
         </div>
 
-        <footer className="login__presentation-footer">
-          Phone Store — Versão 1.0.0
-        </footer>
-      </section>
+        <div className="login__decoration">
+          <span />
+          <span />
+          <span />
+        </div>
+      </aside>
 
       <section className="login__form-area">
         <div className="login__card">
-          <div className="login__card-heading">
+          <header className="login__card-header">
             <div className="login__card-icon">
-              <LockKeyhole size={25} />
+              <LockKeyhole size={23} />
             </div>
 
             <div>
-              <h2>Acessar o sistema</h2>
+              <h2>Bem-vindo</h2>
 
               <p>
-                Informe suas credenciais para
-                continuar.
+                Entre com suas credenciais.
               </p>
             </div>
-          </div>
+          </header>
 
           {formError && (
             <div
@@ -199,7 +192,7 @@ export function Login() {
               <span>E-mail</span>
 
               <div className="login__input-wrapper">
-                <Mail size={19} />
+                <Mail size={18} />
 
                 <input
                   type="email"
@@ -225,7 +218,7 @@ export function Login() {
               <span>Senha</span>
 
               <div className="login__input-wrapper">
-                <LockKeyhole size={19} />
+                <LockKeyhole size={18} />
 
                 <input
                   type={
@@ -261,16 +254,11 @@ export function Login() {
                       ? 'Ocultar senha'
                       : 'Mostrar senha'
                   }
-                  title={
-                    isPasswordVisible
-                      ? 'Ocultar senha'
-                      : 'Mostrar senha'
-                  }
                 >
                   {isPasswordVisible ? (
-                    <EyeOff size={19} />
+                    <EyeOff size={18} />
                   ) : (
-                    <Eye size={19} />
+                    <Eye size={18} />
                   )}
                 </button>
               </div>
@@ -281,7 +269,7 @@ export function Login() {
               className="login__submit"
               disabled={isSubmitting}
             >
-              <LogIn size={19} />
+              <LogIn size={18} />
 
               {isSubmitting
                 ? 'Entrando...'
@@ -290,8 +278,8 @@ export function Login() {
           </form>
 
           <p className="login__security">
-            O acesso é permitido apenas para
-            usuários autorizados.
+            Acesso exclusivo para usuários
+            autorizados.
           </p>
         </div>
       </section>
