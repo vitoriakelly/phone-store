@@ -12,6 +12,10 @@ export type PaymentMethod =
   | 'TROCA_DISPOSITIVO'
   | 'OUTRO';
 
+export type CommissionType =
+  | 'PERCENTAGE'
+  | 'FIXED';
+
 export interface SalePayment {
   id: string;
   saleId: string;
@@ -75,7 +79,16 @@ export interface CreateSaleInput {
   customerAddressNumber: string;
   customerSocialNetwork: string;
 
+  /*
+   * Valor bruto antes do desconto.
+   */
   salePrice: number;
+
+  discountAmount: number;
+
+  commissionType?: CommissionType;
+  commissionValue?: number;
+
   payments: SalePaymentInput[];
   soldAt: string;
 
@@ -97,7 +110,22 @@ export interface Sale {
   deviceCondition: DeviceCondition | null;
 
   purchasePrice: number;
+
+  /*
+   * Valor bruto antes do desconto.
+   */
+  grossSalePrice: number;
+
+  discountAmount: number;
+
+  /*
+   * Valor líquido efetivamente pago.
+   */
   salePrice: number;
+
+  commissionType: CommissionType | null;
+  commissionValue: number | null;
+  commissionAmount: number;
 
   customerName: string;
   customerPhone: string | null;
@@ -109,7 +137,10 @@ export interface Sale {
   customerAddressNumber: string | null;
   customerSocialNetwork: string | null;
 
-  
+  /**
+   * Campo legado retornado pelo backend.
+   * Representa apenas o primeiro pagamento.
+   */
   paymentMethod: PaymentMethod;
 
   payments: SalePayment[];

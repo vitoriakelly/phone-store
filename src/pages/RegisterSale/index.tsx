@@ -35,6 +35,7 @@ import { createSale } from '../../services/saleApi';
 import { listSellers } from '../../services/userApi';
 import type { Device } from '../../types/device';
 import type {
+  CommissionType,
   PaymentMethod,
   TradeInDeviceInput,
 } from '../../types/sale';
@@ -209,6 +210,9 @@ export function RegisterSale() {
       customerSocialNetwork: '',
 
       salePrice: undefined,
+      discountAmount: 0,
+      commissionType: undefined,
+      commissionValue: undefined,
 
       payments: [
         {
@@ -259,6 +263,15 @@ export function RegisterSale() {
   const watchedSalePrice =
     watch('salePrice');
 
+  const watchedDiscountAmount =
+    watch('discountAmount');
+
+  const watchedCommissionType =
+    watch('commissionType');
+
+  const watchedCommissionValue =
+    watch('commissionValue');
+
   const watchedPayments =
     watch('payments') ?? [];
 
@@ -266,6 +279,33 @@ export function RegisterSale() {
     getNumericValue(
       watchedSalePrice,
     );
+
+  const discountAmount =
+    getNumericValue(
+      watchedDiscountAmount,
+    );
+
+  const finalSalePrice =
+    Math.max(
+      salePrice -
+        discountAmount,
+      0,
+    );
+
+  const commissionValue =
+    getNumericValue(
+      watchedCommissionValue,
+    );
+
+  const commissionAmount =
+    watchedCommissionType ===
+      'PERCENTAGE'
+      ? finalSalePrice *
+        (commissionValue / 100)
+      : watchedCommissionType ===
+          'FIXED'
+        ? commissionValue
+        : 0;
 
   const totalReceived =
     watchedPayments.reduce(
@@ -278,7 +318,7 @@ export function RegisterSale() {
     );
 
   const differenceInCents =
-    convertToCents(salePrice) -
+    convertToCents(finalSalePrice) -
     convertToCents(totalReceived);
 
   const remainingValue =
@@ -299,7 +339,7 @@ export function RegisterSale() {
     );
 
   const paymentTotalIsValid =
-    salePrice > 0 &&
+    finalSalePrice > 0 &&
     totalReceived > 0 &&
     differenceInCents === 0;
 
@@ -400,6 +440,10 @@ export function RegisterSale() {
           salePrice:
             apiDevice.salePrice ??
             undefined,
+
+          discountAmount: 0,
+          commissionType: undefined,
+          commissionValue: undefined,
 
           payments: [
             {
@@ -690,6 +734,15 @@ export function RegisterSale() {
           data.customerSocialNetwork.trim(),
 
         salePrice: data.salePrice,
+
+        discountAmount:
+          data.discountAmount,
+
+        commissionType:
+          data.commissionType,
+
+        commissionValue:
+          data.commissionValue,
 
         payments:
           data.payments.map(
@@ -1257,8 +1310,8 @@ export function RegisterSale() {
 
               <p>
                 Vendedor responsável,
-                valor final e data da
-                negociação.
+                desconto, comissão e data
+                da negociação.
               </p>
             </div>
           </div>
@@ -1314,7 +1367,7 @@ export function RegisterSale() {
 
             <div className="register-sale__field">
               <label htmlFor="salePrice">
-                Valor final da venda *
+                Valor bruto da venda *
               </label>
 
               <div className="register-sale__input-prefix">
@@ -1323,7 +1376,7 @@ export function RegisterSale() {
                 <input
                   id="salePrice"
                   type="number"
-                  min="0"
+                  min="0.01"
                   step="0.01"
                   {...register(
                     'salePrice',
@@ -1350,6 +1403,51 @@ export function RegisterSale() {
             </div>
 
             <div className="register-sale__field">
+              <label htmlFor="discountAmount">
+                Desconto
+              </label>
+
+              <div className="register-sale__input-prefix">
+                <span>R$</span>
+
+                <input
+                  id="discountAmount"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  placeholder="0,00"
+                  {...register(
+                    'discountAmount',
+                    {
+                      setValueAs: (
+                        value,
+                      ) =>
+                        value === ''
+                          ? 0
+                          : Number(value),
+                    },
+                  )}
+                />
+              </div>
+
+              <small>
+                Campo opcional. Os
+                pagamentos devem totalizar
+                o valor final após o
+                desconto.
+              </small>
+
+              {errors.discountAmount && (
+                <span className="register-sale__error">
+                  {
+                    errors.discountAmount
+                      .message
+                  }
+                </span>
+              )}
+            </div>
+
+            <div className="register-sale__field">
               <label htmlFor="soldAt">
                 Data da venda *
               </label>
@@ -1365,6 +1463,153 @@ export function RegisterSale() {
                   {errors.soldAt.message}
                 </span>
               )}
+            </div>
+
+            <div className="register-sale__field">
+              <label htmlFor="commissionType">
+                Tipo de comissão
+              </label>
+
+              <select
+                id="commissionType"
+                {...register(
+                  'commissionType',
+                  {
+                    setValueAs: (
+                      value,
+                    ) =>
+                      value === ''
+                        ? undefined
+                        : (value as CommissionType),
+                  },
+                )}
+              >
+                <option value="">
+                  Sem comissão
+                </option>
+
+                <option value="PERCENTAGE">
+                  Porcentagem
+                </option>
+
+                <option value="FIXED">
+                  Valor fixo
+                </option>
+              </select>
+
+              {errors.commissionType && (
+                <span className="register-sale__error">
+                  {
+                    errors.commissionType
+                      .message
+                  }
+                </span>
+              )}
+            </div>
+
+            {watchedCommissionType && (
+              <div className="register-sale__field">
+                <label htmlFor="commissionValue">
+                  {watchedCommissionType ===
+                  'PERCENTAGE'
+                    ? 'Percentual da comissão *'
+                    : 'Valor fixo da comissão *'}
+                </label>
+
+                <div className="register-sale__input-prefix">
+                  <span>
+                    {watchedCommissionType ===
+                    'PERCENTAGE'
+                      ? '%'
+                      : 'R$'}
+                  </span>
+
+                  <input
+                    id="commissionValue"
+                    type="number"
+                    min="0.01"
+                    max={
+                      watchedCommissionType ===
+                      'PERCENTAGE'
+                        ? 100
+                        : undefined
+                    }
+                    step="0.01"
+                    placeholder={
+                      watchedCommissionType ===
+                      'PERCENTAGE'
+                        ? 'Ex.: 5'
+                        : 'Ex.: 150,00'
+                    }
+                    {...register(
+                      'commissionValue',
+                      {
+                        setValueAs: (
+                          value,
+                        ) =>
+                          value === ''
+                            ? undefined
+                            : Number(
+                                value,
+                              ),
+                      },
+                    )}
+                  />
+                </div>
+
+                {errors.commissionValue && (
+                  <span className="register-sale__error">
+                    {
+                      errors.commissionValue
+                        .message
+                    }
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
+
+          <div className="register-sale__financial-summary">
+            <div>
+              <span>Valor bruto</span>
+
+              <strong>
+                {formatCurrency(
+                  salePrice,
+                )}
+              </strong>
+            </div>
+
+            <div>
+              <span>Desconto</span>
+
+              <strong>
+                {formatCurrency(
+                  discountAmount,
+                )}
+              </strong>
+            </div>
+
+            <div>
+              <span>Valor final</span>
+
+              <strong>
+                {formatCurrency(
+                  finalSalePrice,
+                )}
+              </strong>
+            </div>
+
+            <div>
+              <span>
+                Comissão calculada
+              </span>
+
+              <strong>
+                {formatCurrency(
+                  commissionAmount,
+                )}
+              </strong>
             </div>
           </div>
         </section>
@@ -1640,11 +1885,21 @@ export function RegisterSale() {
 
           <div className="register-sale__payment-summary">
             <div>
-              <span>Valor da venda</span>
+              <span>Valor bruto</span>
 
               <strong>
                 {formatCurrency(
                   salePrice,
+                )}
+              </strong>
+            </div>
+
+            <div>
+              <span>Valor final</span>
+
+              <strong>
+                {formatCurrency(
+                  finalSalePrice,
                 )}
               </strong>
             </div>
@@ -1681,7 +1936,7 @@ export function RegisterSale() {
                           remainingValue,
                         ),
                       )
-                    : salePrice > 0
+                    : finalSalePrice > 0
                       ? 'Pagamento completo'
                       : 'Informe os valores'}
               </strong>

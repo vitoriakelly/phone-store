@@ -10,6 +10,11 @@ const paymentMethodSchema = z.enum([
   'OUTRO',
 ]);
 
+const commissionTypeSchema = z.enum([
+  'PERCENTAGE',
+  'FIXED',
+]);
+
 const datePattern =
   /^\d{4}-\d{2}-\d{2}$/;
 
@@ -310,6 +315,9 @@ export const saleSchema = z
         'A rede social deve possuir no máximo 160 caracteres.',
       ),
 
+    /*
+     * Valor bruto antes do desconto.
+     */
     salePrice: z
       .number({
         message:
@@ -318,6 +326,29 @@ export const saleSchema = z
       .positive(
         'O valor da venda deve ser maior que zero.',
       ),
+
+    discountAmount: z
+      .number({
+        message:
+          'O desconto deve ser um número.',
+      })
+      .min(
+        0,
+        'O desconto não pode ser negativo.',
+      ),
+
+    commissionType:
+      commissionTypeSchema.optional(),
+
+    commissionValue: z
+      .number({
+        message:
+          'Informe o valor da comissão.',
+      })
+      .positive(
+        'O valor da comissão deve ser maior que zero.',
+      )
+      .optional(),
 
     payments: z
       .array(paymentSchema)
@@ -350,8 +381,29 @@ export const saleSchema = z
       tradeInDeviceSchema.optional(),
   })
   .superRefine((data, context) => {
-    const salePriceInCents =
+    const grossSalePriceInCents =
       convertToCents(data.salePrice);
+
+    const discountAmountInCents =
+      convertToCents(
+        data.discountAmount,
+      );
+
+    if (
+      discountAmountInCents >=
+      grossSalePriceInCents
+    ) {
+      context.addIssue({
+        code: 'custom',
+        path: ['discountAmount'],
+        message:
+          'O desconto deve ser menor que o valor da venda.',
+      });
+    }
+
+    const finalSalePriceInCents =
+      grossSalePriceInCents -
+      discountAmountInCents;
 
     const paymentsTotalInCents =
       data.payments.reduce(
@@ -364,11 +416,12 @@ export const saleSchema = z
       );
 
     if (
+      finalSalePriceInCents > 0 &&
       paymentsTotalInCents !==
-      salePriceInCents
+      finalSalePriceInCents
     ) {
       const differenceInCents =
-        salePriceInCents -
+        finalSalePriceInCents -
         paymentsTotalInCents;
 
       const formattedDifference = (
@@ -386,6 +439,65 @@ export const saleSchema = z
           differenceInCents > 0
             ? `Ainda faltam ${formattedDifference} para completar o valor da venda.`
             : `Os pagamentos excedem o valor da venda em ${formattedDifference}.`,
+      });
+    }
+
+    if (
+      data.commissionType &&
+      data.commissionValue ===
+        undefined
+    ) {
+      context.addIssue({
+        code: 'custom',
+        path: ['commissionValue'],
+        message:
+          'Informe o percentual ou o valor fixo da comissão.',
+      });
+    }
+
+    if (
+      !data.commissionType &&
+      data.commissionValue !==
+        undefined
+    ) {
+      context.addIssue({
+        code: 'custom',
+        path: ['commissionType'],
+        message:
+          'Selecione o tipo da comissão.',
+      });
+    }
+
+    if (
+      data.commissionType ===
+        'PERCENTAGE' &&
+      data.commissionValue !==
+        undefined &&
+      data.commissionValue > 100
+    ) {
+      context.addIssue({
+        code: 'custom',
+        path: ['commissionValue'],
+        message:
+          'O percentual da comissão não pode ser maior que 100%.',
+      });
+    }
+
+    if (
+      data.commissionType ===
+        'FIXED' &&
+      data.commissionValue !==
+        undefined &&
+      convertToCents(
+        data.commissionValue,
+      ) >
+        finalSalePriceInCents
+    ) {
+      context.addIssue({
+        code: 'custom',
+        path: ['commissionValue'],
+        message:
+          'A comissão fixa não pode ser maior que o valor final da venda.',
       });
     }
 
