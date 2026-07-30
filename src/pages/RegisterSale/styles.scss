@@ -117,32 +117,55 @@
   }
 
   &__section-heading {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    align-items: flex-start;
+    gap: 12px;
+
     margin-bottom: 24px;
     padding-bottom: 18px;
     border-bottom: 1px solid #e5e7eb;
 
+    > svg {
+      margin-top: 1px;
+      color: #2563eb;
+    }
+
+    > div {
+      min-width: 0;
+    }
+
+    > h2,
+    > p {
+      grid-column: 1 / -1;
+    }
+
     h2 {
+      margin: 0;
+
       color: #111827;
       font-size: 19px;
     }
 
     p {
-      margin-top: 5px;
+      margin: 5px 0 0;
+
+      color: #6b7280;
       font-size: 13px;
+      line-height: 1.5;
     }
   }
 
   &__grid {
     display: grid;
-    grid-template-columns: repeat(
-      2,
-      minmax(0, 1fr)
-    );
+    grid-template-columns:
+      repeat(2, minmax(0, 1fr));
     gap: 22px;
   }
 
   &__field {
     display: flex;
+    min-width: 0;
     flex-direction: column;
 
     label {
@@ -164,6 +187,8 @@
       color: #111827;
       background-color: #ffffff;
 
+      font: inherit;
+
       transition:
         border-color 0.2s,
         box-shadow 0.2s;
@@ -172,6 +197,18 @@
         border-color: #2563eb;
         box-shadow: 0 0 0 3px
           rgb(37 99 235 / 12%);
+      }
+
+      &:disabled {
+        cursor: not-allowed;
+        background-color: #f3f4f6;
+        opacity: 0.75;
+      }
+
+      &[readonly] {
+        cursor: default;
+        color: #374151;
+        background-color: #f9fafb;
       }
     }
 
@@ -186,6 +223,14 @@
       padding: 13px;
       resize: vertical;
     }
+
+    small {
+      margin-top: 7px;
+
+      color: #6b7280;
+      font-size: 12px;
+      line-height: 1.45;
+    }
   }
 
   &__input-prefix {
@@ -197,6 +242,7 @@
     span {
       position: absolute;
       left: 13px;
+      z-index: 1;
 
       color: #6b7280;
       font-size: 14px;
@@ -209,10 +255,208 @@
   }
 
   &__error {
+    display: block;
+
     margin-top: 6px;
 
     color: #dc2626;
     font-size: 12px;
+    line-height: 1.4;
+  }
+
+  /*
+   * Bloco de cada forma de pagamento
+   */
+  &__payment {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+
+    margin-bottom: 16px;
+    padding: 20px;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+
+    background-color: #f9fafb;
+
+    &:last-of-type {
+      margin-bottom: 18px;
+    }
+  }
+
+  /*
+   * Botão remover pagamento
+   */
+  &__remove-payment {
+    display: inline-flex;
+    align-self: flex-end;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+
+    min-height: 40px;
+    padding: 0 14px;
+    border: 1px solid #fecaca;
+    border-radius: 9px;
+
+    color: #b91c1c;
+    background-color: #ffffff;
+
+    font: inherit;
+    font-size: 13px;
+    font-weight: 600;
+
+    cursor: pointer;
+
+    transition:
+      color 0.2s,
+      border-color 0.2s,
+      background-color 0.2s,
+      transform 0.2s;
+
+    &:hover:not(:disabled) {
+      border-color: #fca5a5;
+
+      color: #991b1b;
+      background-color: #fef2f2;
+    }
+
+    &:active:not(:disabled) {
+      transform: translateY(1px);
+    }
+
+    &:focus-visible {
+      outline: 3px solid
+        rgb(220 38 38 / 15%);
+      outline-offset: 2px;
+    }
+
+    &:disabled {
+      border-color: #e5e7eb;
+
+      color: #9ca3af;
+      background-color: #f3f4f6;
+
+      cursor: not-allowed;
+      opacity: 0.75;
+    }
+  }
+
+  /*
+   * Botão adicionar pagamento
+   */
+  &__add-payment {
+    display: inline-flex;
+    align-self: flex-start;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+
+    min-height: 44px;
+    margin-top: 2px;
+    padding: 0 18px;
+    border: 1px solid #bfdbfe;
+    border-radius: 9px;
+
+    color: #1d4ed8;
+    background-color: #eff6ff;
+
+    font: inherit;
+    font-size: 14px;
+    font-weight: 600;
+
+    cursor: pointer;
+
+    transition:
+      color 0.2s,
+      border-color 0.2s,
+      background-color 0.2s,
+      transform 0.2s;
+
+    &:hover:not(:disabled) {
+      border-color: #93c5fd;
+
+      color: #1e40af;
+      background-color: #dbeafe;
+    }
+
+    &:active:not(:disabled) {
+      transform: translateY(1px);
+    }
+
+    &:focus-visible {
+      outline: 3px solid
+        rgb(37 99 235 / 15%);
+      outline-offset: 2px;
+    }
+
+    &:disabled {
+      border-color: #e5e7eb;
+
+      color: #9ca3af;
+      background-color: #f3f4f6;
+
+      cursor: not-allowed;
+      opacity: 0.75;
+    }
+  }
+
+  /*
+   * Resumo dos valores
+   */
+  &__payment-summary {
+    display: grid;
+    grid-template-columns:
+      repeat(3, minmax(0, 1fr));
+    gap: 14px;
+
+    margin-top: 22px;
+    padding: 16px;
+    border: 1px solid #dbeafe;
+    border-radius: 12px;
+
+    background-color: #eff6ff;
+
+    > div {
+      display: flex;
+      min-width: 0;
+      flex-direction: column;
+      gap: 5px;
+
+      padding: 14px;
+      border: 1px solid #e5e7eb;
+      border-radius: 10px;
+
+      background-color: #ffffff;
+    }
+
+    span {
+      color: #6b7280;
+      font-size: 12px;
+      font-weight: 500;
+    }
+
+    strong {
+      overflow-wrap: anywhere;
+
+      color: #111827;
+      font-size: 16px;
+      font-weight: 700;
+      line-height: 1.35;
+    }
+  }
+
+  &__submit-error {
+    padding: 14px 16px;
+    border: 1px solid #fecaca;
+    border-radius: 10px;
+
+    color: #b91c1c;
+    background-color: #fef2f2;
+
+    font-size: 14px;
+    font-weight: 500;
+    line-height: 1.5;
   }
 
   &__actions {
@@ -247,6 +491,15 @@
 
     color: #374151;
     background-color: #ffffff;
+
+    transition:
+      border-color 0.2s,
+      background-color 0.2s;
+
+    &:hover {
+      border-color: #9ca3af;
+      background-color: #f9fafb;
+    }
   }
 
   &__submit {
@@ -256,8 +509,18 @@
     color: #ffffff;
     background-color: #15803d;
 
-    &:hover {
+    cursor: pointer;
+
+    transition:
+      background-color 0.2s,
+      transform 0.2s;
+
+    &:hover:not(:disabled) {
       background-color: #166534;
+    }
+
+    &:active:not(:disabled) {
+      transform: translateY(1px);
     }
 
     &:disabled {
@@ -335,11 +598,41 @@
     &__section {
       padding: 20px 16px;
     }
+
+    &__payment {
+      padding: 16px;
+    }
+
+    &__payment-summary {
+      grid-template-columns: 1fr;
+    }
   }
 }
 
 @media (max-width: 520px) {
   .register-sale {
+    &__heading {
+      align-items: flex-start;
+    }
+
+    &__section-heading {
+      grid-template-columns: 1fr;
+
+      > svg {
+        margin-bottom: 2px;
+      }
+    }
+
+    &__payment {
+      padding: 14px;
+    }
+
+    &__remove-payment,
+    &__add-payment {
+      width: 100%;
+      align-self: stretch;
+    }
+
     &__actions {
       flex-direction: column-reverse;
       padding: 16px;
@@ -350,15 +643,4 @@
       width: 100%;
     }
   }
-  .register-sale__submit-error {
-  padding: 14px 16px;
-  border: 1px solid #fecaca;
-  border-radius: 10px;
-
-  color: #b91c1c;
-  background-color: #fef2f2;
-
-  font-size: 14px;
-  font-weight: 500;
-}
 }

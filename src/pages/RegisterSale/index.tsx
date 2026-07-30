@@ -467,6 +467,7 @@ export function RegisterSale() {
   function handlePaymentMethodChange(
     index: number,
     method: PaymentMethod,
+    previousMethod: PaymentMethod,
   ) {
     if (
       method !==
@@ -485,19 +486,41 @@ export function RegisterSale() {
       method ===
       'TROCA_DISPOSITIVO'
     ) {
-      const currentAmount =
+      /*
+       * O valor da troca é informado no
+       * cadastro do aparelho recebido.
+       * Aqui apenas inicializamos o
+       * pagamento com esse valor.
+       */
+      const purchasePrice =
         getNumericValue(
-          watchedPayments[index]
-            ?.amount,
+          watch(
+            'tradeInDevice.purchasePrice',
+          ),
         );
 
       setValue(
-        'tradeInDevice.purchasePrice',
-        currentAmount > 0
-          ? currentAmount
-          : undefined,
+        `payments.${index}.amount`,
+        purchasePrice,
         {
+          shouldDirty: true,
           shouldValidate: true,
+        },
+      );
+    }
+
+    if (
+      previousMethod ===
+        'TROCA_DISPOSITIVO' &&
+      method !==
+        'TROCA_DISPOSITIVO'
+    ) {
+      setValue(
+        'tradeInDevice.purchasePrice',
+        undefined,
+        {
+          shouldDirty: true,
+          shouldValidate: false,
         },
       );
     }
@@ -505,35 +528,39 @@ export function RegisterSale() {
     clearErrors('payments');
   }
 
-  function handlePaymentAmountChange(
-    index: number,
+  function handleTradeInPurchasePriceChange(
     rawValue: string,
   ) {
-    const paymentMethod =
-      watchedPayments[index]
-        ?.method;
-
-    if (
-      paymentMethod !==
-      'TROCA_DISPOSITIVO'
-    ) {
+    if (tradePaymentIndex < 0) {
       return;
     }
 
-    const amount =
+    const parsedValue =
       rawValue === ''
-        ? undefined
+        ? 0
         : Number(rawValue);
 
+    const purchasePrice =
+      Number.isFinite(parsedValue)
+        ? parsedValue
+        : 0;
+
+    /*
+     * O aparelho recebido abate este
+     * valor do total da nova venda.
+     */
     setValue(
-      'tradeInDevice.purchasePrice',
-      amount &&
-        Number.isFinite(amount)
-        ? amount
-        : undefined,
+      `payments.${tradePaymentIndex}.amount`,
+      purchasePrice,
       {
+        shouldDirty: true,
+        shouldTouch: true,
         shouldValidate: true,
       },
+    );
+
+    clearErrors(
+      `payments.${tradePaymentIndex}.amount`,
     );
   }
 
@@ -1236,9 +1263,10 @@ export function RegisterSale() {
 
               <p>
                 Adicione uma ou mais
-                formas de pagamento. A
-                soma deve ser igual ao
-                valor final da venda.
+                formas de pagamento. Na
+                troca, o valor do aparelho
+                recebido será abatido do
+                total da nova venda.
               </p>
             </div>
           </div>
@@ -1281,6 +1309,7 @@ export function RegisterSale() {
                                 event
                                   .target
                                   .value as PaymentMethod,
+                                currentMethod,
                               ),
                           },
                         )}
@@ -1338,7 +1367,10 @@ export function RegisterSale() {
                       <label
                         htmlFor={`paymentAmount-${index}`}
                       >
-                        Valor recebido *
+                        {currentMethod ===
+                        'TROCA_DISPOSITIVO'
+                          ? 'Valor abatido pela troca *'
+                          : 'Valor recebido *'}
                       </label>
 
                       <div className="register-sale__input-prefix">
@@ -1347,8 +1379,12 @@ export function RegisterSale() {
                         <input
                           id={`paymentAmount-${index}`}
                           type="number"
-                          min="0"
+                          min="0.01"
                           step="0.01"
+                          readOnly={
+                            currentMethod ===
+                            'TROCA_DISPOSITIVO'
+                          }
                           {...register(
                             `payments.${index}.amount`,
                             {
@@ -1360,20 +1396,21 @@ export function RegisterSale() {
                                   : Number(
                                       value,
                                     ),
-
-                              onChange: (
-                                event,
-                              ) =>
-                                handlePaymentAmountChange(
-                                  index,
-                                  event
-                                    .target
-                                    .value,
-                                ),
                             },
                           )}
                         />
                       </div>
+
+                      {currentMethod ===
+                        'TROCA_DISPOSITIVO' && (
+                        <small>
+                          Informe o valor no
+                          cadastro do dispositivo
+                          recebido. Ele será
+                          abatido automaticamente
+                          do total da venda.
+                        </small>
+                      )}
 
                       {errors.payments?.[
                         index
@@ -1498,7 +1535,9 @@ export function RegisterSale() {
             </div>
 
             <div>
-              <span>Total recebido</span>
+              <span>
+                Total contabilizado
+              </span>
 
               <strong>
                 {formatCurrency(
@@ -1845,9 +1884,9 @@ export function RegisterSale() {
                   <input
                     id="tradeInPurchasePrice"
                     type="number"
-                    min="0"
+                    min="0.01"
                     step="0.01"
-                    readOnly
+                    placeholder="Ex.: 1200,00"
                     {...register(
                       'tradeInDevice.purchasePrice',
                       {
@@ -1859,15 +1898,25 @@ export function RegisterSale() {
                             : Number(
                                 value,
                               ),
+
+                        onChange: (
+                          event,
+                        ) =>
+                          handleTradeInPurchasePriceChange(
+                            event.target
+                              .value,
+                          ),
                       },
                     )}
                   />
                 </div>
 
                 <small>
-                  Este valor acompanha
-                  automaticamente o
-                  pagamento por troca.
+                  Informe por quanto o
+                  dispositivo foi recebido.
+                  Esse valor será descontado
+                  automaticamente do valor
+                  total da nova venda.
                 </small>
 
                 {errors.tradeInDevice
