@@ -655,3 +655,39 @@
     }
   }
 }
+.sales {
+  &__table {
+    min-width: 1320px;
+  }
+
+  /* 2. Badge da condição do dispositivo. */
+  &__condition {
+    display: inline-flex;
+
+    padding: 6px 10px;
+    border-radius: 999px;
+
+    font-size: 12px;
+    font-weight: 600;
+
+    &--novo {
+      color: #1d4ed8;
+      background-color: #dbeafe;
+    }
+
+    &--seminovo {
+      color: #6d28d9;
+      background-color: #ede9fe;
+    }
+
+    &--usado {
+      color: #9a3412;
+      background-color: #ffedd5;
+    }
+
+    &--nao-informado {
+      color: #4b5563;
+      background-color: #e5e7eb;
+    }
+  }
+}

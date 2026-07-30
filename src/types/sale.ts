@@ -94,6 +94,7 @@ export interface Sale {
   deviceBrand: string;
   deviceModel: string;
   deviceImei: string;
+  deviceCondition: DeviceCondition | null;
 
   purchasePrice: number;
   salePrice: number;
@@ -108,10 +109,7 @@ export interface Sale {
   customerAddressNumber: string | null;
   customerSocialNetwork: string | null;
 
-  /**
-   * Campo legado retornado pelo backend.
-   * Representa apenas o primeiro pagamento.
-   */
+  
   paymentMethod: PaymentMethod;
 
   payments: SalePayment[];

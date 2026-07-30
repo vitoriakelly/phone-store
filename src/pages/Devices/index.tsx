@@ -25,6 +25,7 @@ import {
 } from '../../services/deviceApi';
 import type {
   Device,
+  DeviceCondition,
   DeviceStatus,
 } from '../../types/device';
 import { formatCurrency } from '../../utils/currency';
@@ -34,6 +35,10 @@ import './styles.scss';
 type StatusFilter =
   | 'TODOS'
   | DeviceStatus;
+
+type ConditionFilter =
+  | 'TODOS'
+  | DeviceCondition;
 
 interface LocationState {
   successMessage?: string;
@@ -54,6 +59,21 @@ function getStatusLabel(
   };
 
   return labels[status];
+}
+
+function getConditionLabel(
+  condition: DeviceCondition,
+) {
+  const labels: Record<
+    DeviceCondition,
+    string
+  > = {
+    NOVO: 'Novo',
+    SEMINOVO: 'Seminovo',
+    USADO: 'Usado',
+  };
+
+  return labels[condition];
 }
 
 function formatDate(date: string) {
@@ -105,6 +125,13 @@ export function Devices() {
     'TODOS',
   );
 
+  const [
+    conditionFilter,
+    setConditionFilter,
+  ] = useState<ConditionFilter>(
+    'TODOS',
+  );
+
   const [startDate, setStartDate] =
     useState('');
 
@@ -138,6 +165,7 @@ export function Devices() {
   const hasActiveFilters =
     search.trim() !== '' ||
     statusFilter !== 'TODOS' ||
+    conditionFilter !== 'TODOS' ||
     startDate !== '' ||
     endDate !== '';
 
@@ -224,6 +252,12 @@ export function Devices() {
             device.status ===
               statusFilter;
 
+          const matchesCondition =
+            conditionFilter ===
+              'TODOS' ||
+            device.condition ===
+              conditionFilter;
+
           const searchableContent =
             [
               device.brand,
@@ -232,6 +266,10 @@ export function Devices() {
               device.color ?? '',
               device.storage,
               device.supplier ?? '',
+              getConditionLabel(
+                device.condition,
+              ),
+              device.condition,
             ]
               .join(' ')
               .toLowerCase();
@@ -257,6 +295,7 @@ export function Devices() {
 
           return (
             matchesStatus &&
+            matchesCondition &&
             matchesSearch &&
             matchesStartDate &&
             matchesEndDate
@@ -289,6 +328,7 @@ export function Devices() {
       devices,
       search,
       statusFilter,
+      conditionFilter,
       startDate,
       endDate,
       isDateRangeInvalid,
@@ -297,6 +337,7 @@ export function Devices() {
   function handleClearFilters() {
     setSearch('');
     setStatusFilter('TODOS');
+    setConditionFilter('TODOS');
     setStartDate('');
     setEndDate('');
   }
@@ -397,7 +438,7 @@ export function Devices() {
                   event.target.value,
                 )
               }
-              placeholder="Pesquisar por marca, modelo, IMEI, cor ou fornecedor"
+              placeholder="Pesquisar por marca, modelo, condição, IMEI, cor ou fornecedor"
               aria-label="Pesquisar dispositivos"
               disabled={isLoading}
             />
@@ -432,6 +473,34 @@ export function Devices() {
 
             <option value="VENDIDO">
               Vendidos
+            </option>
+          </select>
+
+          <select
+            value={conditionFilter}
+            onChange={(event) =>
+              setConditionFilter(
+                event.target
+                  .value as ConditionFilter,
+              )
+            }
+            aria-label="Filtrar por condição"
+            disabled={isLoading}
+          >
+            <option value="TODOS">
+              Todas as condições
+            </option>
+
+            <option value="NOVO">
+              Novos
+            </option>
+
+            <option value="SEMINOVO">
+              Seminovos
+            </option>
+
+            <option value="USADO">
+              Usados
             </option>
           </select>
 
@@ -535,6 +604,7 @@ export function Devices() {
                           Dispositivo
                         </th>
 
+                        <th>Condição</th>
                         <th>IMEI</th>
                         <th>Entrada</th>
                         <th>Compra</th>
@@ -589,6 +659,16 @@ export function Devices() {
                                     </span>
                                   </div>
                                 </div>
+                              </td>
+
+                              <td>
+                                <span
+                                  className={`devices__condition devices__condition--${device.condition.toLowerCase()}`}
+                                >
+                                  {getConditionLabel(
+                                    device.condition,
+                                  )}
+                                </span>
                               </td>
 
                               <td>
@@ -723,6 +803,18 @@ export function Devices() {
                           </div>
 
                           <div className="devices__card-info">
+                            <div>
+                              <span>
+                                Condição
+                              </span>
+
+                              <strong>
+                                {getConditionLabel(
+                                  device.condition,
+                                )}
+                              </strong>
+                            </div>
+
                             <div>
                               <span>IMEI</span>
 

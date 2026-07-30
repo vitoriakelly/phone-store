@@ -21,6 +21,9 @@ import {
 } from '../../services/saleApi';
 import { listSellers } from '../../services/userApi';
 import type {
+  DeviceCondition,
+} from '../../types/device';
+import type {
   PaymentMethod,
   Sale,
   SalePayment,
@@ -33,6 +36,10 @@ import './styles.scss';
 type PaymentFilter =
   | 'TODOS'
   | PaymentMethod;
+
+type ConditionFilter =
+  | 'TODOS'
+  | DeviceCondition;
 
 const initialSummary: SaleSummary = {
   total: 0,
@@ -50,6 +57,27 @@ function formatDate(date: string) {
 
 function getDateOnly(value: string) {
   return value.slice(0, 10);
+}
+
+function getConditionLabel(
+  condition:
+    | DeviceCondition
+    | null,
+) {
+  if (!condition) {
+    return 'Não informado';
+  }
+
+  const labels: Record<
+    DeviceCondition,
+    string
+  > = {
+    NOVO: 'Novo',
+    SEMINOVO: 'Seminovo',
+    USADO: 'Usado',
+  };
+
+  return labels[condition];
 }
 
 function getPaymentMethodLabel(
@@ -205,6 +233,13 @@ export function Sales() {
     'TODOS',
   );
 
+  const [
+    conditionFilter,
+    setConditionFilter,
+  ] = useState<ConditionFilter>(
+    'TODOS',
+  );
+
   const [startDate, setStartDate] =
     useState('');
 
@@ -226,6 +261,7 @@ export function Sales() {
     search.trim() !== '' ||
     paymentFilter !== 'TODOS' ||
     sellerFilter !== 'TODOS' ||
+    conditionFilter !== 'TODOS' ||
     startDate !== '' ||
     endDate !== '';
 
@@ -363,6 +399,10 @@ export function Sales() {
               sale.deviceBrand,
               sale.deviceModel,
               sale.deviceImei,
+              getConditionLabel(
+                sale.deviceCondition,
+              ),
+              sale.deviceCondition,
               paymentContent,
             ]
               .filter(Boolean)
@@ -383,6 +423,12 @@ export function Sales() {
               paymentFilter,
             );
 
+          const matchesCondition =
+            conditionFilter ===
+              'TODOS' ||
+            sale.deviceCondition ===
+              conditionFilter;
+
           const saleDate =
             getDateOnly(
               sale.soldAt,
@@ -399,6 +445,7 @@ export function Sales() {
           return (
             matchesSearch &&
             matchesPayment &&
+            matchesCondition &&
             matchesStartDate &&
             matchesEndDate
           );
@@ -419,6 +466,7 @@ export function Sales() {
       sales,
       search,
       paymentFilter,
+      conditionFilter,
       startDate,
       endDate,
       isDateRangeInvalid,
@@ -459,6 +507,7 @@ export function Sales() {
     setSearch('');
     setPaymentFilter('TODOS');
     setSellerFilter('TODOS');
+    setConditionFilter('TODOS');
     setStartDate('');
     setEndDate('');
   }
@@ -551,7 +600,7 @@ export function Sales() {
                   event.target.value,
                 )
               }
-              placeholder="Pesquisar cliente, vendedor, aparelho, IMEI ou pagamento"
+              placeholder="Pesquisar cliente, vendedor, condição, aparelho, IMEI ou pagamento"
               aria-label="Pesquisar vendas"
               disabled={isLoading}
             />
@@ -632,6 +681,34 @@ export function Sales() {
                   : 'Funcionário'}
               </option>
             ))}
+          </select>
+
+          <select
+            value={conditionFilter}
+            onChange={(event) =>
+              setConditionFilter(
+                event.target
+                  .value as ConditionFilter,
+              )
+            }
+            aria-label="Filtrar por condição do dispositivo"
+            disabled={isLoading}
+          >
+            <option value="TODOS">
+              Todas as condições
+            </option>
+
+            <option value="NOVO">
+              Novos
+            </option>
+
+            <option value="SEMINOVO">
+              Seminovos
+            </option>
+
+            <option value="USADO">
+              Usados
+            </option>
           </select>
 
           <div className="sales__date-filter">
@@ -741,6 +818,7 @@ export function Sales() {
                     <th>Cliente</th>
                     <th>Vendedor</th>
                     <th>Dispositivo</th>
+                    <th>Condição</th>
                     <th>Data</th>
                     <th>Pagamentos</th>
                     <th>Valor</th>
@@ -816,6 +894,20 @@ export function Sales() {
                                 }
                               </span>
                             </div>
+                          </td>
+
+                          <td>
+                            <span
+                              className={`sales__condition sales__condition--${
+                                sale.deviceCondition
+                                  ? sale.deviceCondition.toLowerCase()
+                                  : 'nao-informado'
+                              }`}
+                            >
+                              {getConditionLabel(
+                                sale.deviceCondition,
+                              )}
+                            </span>
                           </td>
 
                           <td>
@@ -942,6 +1034,18 @@ export function Sales() {
                       </div>
 
                       <div className="sales__card-info">
+                        <div>
+                          <span>
+                            Condição
+                          </span>
+
+                          <strong>
+                            {getConditionLabel(
+                              sale.deviceCondition,
+                            )}
+                          </strong>
+                        </div>
+
                         <div>
                           <span>Vendedor</span>
 
