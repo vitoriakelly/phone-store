@@ -1,6 +1,8 @@
 import {
+  CalendarDays,
   Eye,
   Plus,
+  RotateCcw,
   Search,
   Smartphone,
   Trash2,
@@ -79,6 +81,10 @@ function getOptionalValue(
   return value || fallback;
 }
 
+function getDateOnly(value: string) {
+  return value.slice(0, 10);
+}
+
 export function Devices() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -95,10 +101,15 @@ export function Devices() {
   const [
     statusFilter,
     setStatusFilter,
-  ] =
-    useState<StatusFilter>(
-      'TODOS',
-    );
+  ] = useState<StatusFilter>(
+    'TODOS',
+  );
+
+  const [startDate, setStartDate] =
+    useState('');
+
+  const [endDate, setEndDate] =
+    useState('');
 
   const [
     successMessage,
@@ -117,8 +128,18 @@ export function Devices() {
   const [
     deletingDeviceId,
     setDeletingDeviceId,
-  ] =
-    useState<string | null>(null);
+  ] = useState<string | null>(null);
+
+  const isDateRangeInvalid =
+    startDate !== '' &&
+    endDate !== '' &&
+    startDate > endDate;
+
+  const hasActiveFilters =
+    search.trim() !== '' ||
+    statusFilter !== 'TODOS' ||
+    startDate !== '' ||
+    endDate !== '';
 
   useEffect(() => {
     let isMounted = true;
@@ -186,6 +207,10 @@ export function Devices() {
 
   const filteredDevices =
     useMemo(() => {
+      if (isDateRangeInvalid) {
+        return [];
+      }
+
       const normalizedSearch =
         search
           .trim()
@@ -217,9 +242,24 @@ export function Devices() {
               normalizedSearch,
             );
 
+          const entryDate =
+            getDateOnly(
+              device.entryDate,
+            );
+
+          const matchesStartDate =
+            startDate === '' ||
+            entryDate >= startDate;
+
+          const matchesEndDate =
+            endDate === '' ||
+            entryDate <= endDate;
+
           return (
             matchesStatus &&
-            matchesSearch
+            matchesSearch &&
+            matchesStartDate &&
+            matchesEndDate
           );
         })
         .sort(
@@ -249,7 +289,17 @@ export function Devices() {
       devices,
       search,
       statusFilter,
+      startDate,
+      endDate,
+      isDateRangeInvalid,
     ]);
+
+  function handleClearFilters() {
+    setSearch('');
+    setStatusFilter('TODOS');
+    setStartDate('');
+    setEndDate('');
+  }
 
   async function handleDeleteDevice(
     device: Device,
@@ -384,7 +434,75 @@ export function Devices() {
               Vendidos
             </option>
           </select>
+
+          <div className="devices__date-filter">
+            <CalendarDays size={18} />
+
+            <label htmlFor="deviceStartDate">
+              De
+            </label>
+
+            <input
+              id="deviceStartDate"
+              type="date"
+              value={startDate}
+              max={endDate || undefined}
+              onChange={(event) =>
+                setStartDate(
+                  event.target.value,
+                )
+              }
+              aria-label="Data inicial de entrada"
+              disabled={isLoading}
+            />
+          </div>
+
+          <div className="devices__date-filter">
+            <CalendarDays size={18} />
+
+            <label htmlFor="deviceEndDate">
+              Até
+            </label>
+
+            <input
+              id="deviceEndDate"
+              type="date"
+              value={endDate}
+              min={startDate || undefined}
+              onChange={(event) =>
+                setEndDate(
+                  event.target.value,
+                )
+              }
+              aria-label="Data final de entrada"
+              disabled={isLoading}
+            />
+          </div>
+
+          <button
+            type="button"
+            className="devices__clear-filters"
+            onClick={handleClearFilters}
+            disabled={
+              isLoading ||
+              !hasActiveFilters
+            }
+          >
+            <RotateCcw size={17} />
+
+            Limpar filtros
+          </button>
         </div>
+
+        {isDateRangeInvalid && (
+          <div
+            className="devices__filter-error"
+            role="alert"
+          >
+            A data inicial não pode ser
+            posterior à data final.
+          </div>
+        )}
 
         {isLoading ? (
           <div className="devices__loading">
@@ -629,8 +747,7 @@ export function Devices() {
 
                             <div>
                               <span>
-                                Valor de
-                                compra
+                                Valor de compra
                               </span>
 
                               <strong>
@@ -642,8 +759,7 @@ export function Devices() {
 
                             <div>
                               <span>
-                                Valor de
-                                venda
+                                Valor de venda
                               </span>
 
                               <strong>
@@ -703,16 +819,18 @@ export function Devices() {
                 </h2>
 
                 <p>
-                  Cadastre um aparelho ou
-                  altere os filtros
-                  utilizados.
+                  {hasActiveFilters
+                    ? 'Nenhum aparelho corresponde aos filtros utilizados.'
+                    : 'Cadastre um aparelho para começar a gerenciar o estoque.'}
                 </p>
 
-                <Link to="/dispositivos/cadastrar">
-                  <Plus size={18} />
+                {!hasActiveFilters && (
+                  <Link to="/dispositivos/cadastrar">
+                    <Plus size={18} />
 
-                  Cadastrar dispositivo
-                </Link>
+                    Cadastrar dispositivo
+                  </Link>
+                )}
               </div>
             )}
           </>
