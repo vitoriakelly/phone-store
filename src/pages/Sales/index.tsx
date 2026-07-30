@@ -2,6 +2,7 @@ import {
   BadgeDollarSign,
   CalendarDays,
   Eye,
+  RotateCcw,
   Search,
   Smartphone,
   UserRound,
@@ -45,6 +46,10 @@ function formatDate(date: string) {
   );
 }
 
+function getDateOnly(value: string) {
+  return value.slice(0, 10);
+}
+
 function getPaymentMethodLabel(
   paymentMethod: PaymentMethod,
 ) {
@@ -75,10 +80,6 @@ function getSalePayments(
     return sale.payments;
   }
 
-  /*
-   * Compatibilidade com vendas antigas
-   * que possuíam apenas paymentMethod.
-   */
   return [
     {
       id: `legacy-${sale.id}`,
@@ -184,11 +185,28 @@ export function Sales() {
     'TODOS',
   );
 
+  const [startDate, setStartDate] =
+    useState('');
+
+  const [endDate, setEndDate] =
+    useState('');
+
   const [isLoading, setIsLoading] =
     useState(true);
 
   const [loadError, setLoadError] =
     useState('');
+
+  const isDateRangeInvalid =
+    startDate !== '' &&
+    endDate !== '' &&
+    startDate > endDate;
+
+  const hasActiveFilters =
+    search.trim() !== '' ||
+    paymentFilter !== 'TODOS' ||
+    startDate !== '' ||
+    endDate !== '';
 
   useEffect(() => {
     let isMounted = true;
@@ -242,6 +260,10 @@ export function Sales() {
 
   const filteredSales =
     useMemo(() => {
+      if (isDateRangeInvalid) {
+        return [];
+      }
+
       const normalizedSearch =
         search
           .trim()
@@ -288,9 +310,24 @@ export function Sales() {
               paymentFilter,
             );
 
+          const saleDate =
+            getDateOnly(
+              sale.soldAt,
+            );
+
+          const matchesStartDate =
+            startDate === '' ||
+            saleDate >= startDate;
+
+          const matchesEndDate =
+            endDate === '' ||
+            saleDate <= endDate;
+
           return (
             matchesSearch &&
-            matchesPayment
+            matchesPayment &&
+            matchesStartDate &&
+            matchesEndDate
           );
         })
         .sort(
@@ -309,6 +346,9 @@ export function Sales() {
       sales,
       search,
       paymentFilter,
+      startDate,
+      endDate,
+      isDateRangeInvalid,
     ]);
 
   const filteredRevenue =
@@ -327,10 +367,6 @@ export function Sales() {
       0,
     );
 
-  const hasActiveFilters =
-    search.trim() !== '' ||
-    paymentFilter !== 'TODOS';
-
   const displayedTotal =
     hasActiveFilters
       ? filteredSales.length
@@ -345,6 +381,13 @@ export function Sales() {
     hasActiveFilters
       ? filteredProfit
       : summary.totalProfit;
+
+  function handleClearFilters() {
+    setSearch('');
+    setPaymentFilter('TODOS');
+    setStartDate('');
+    setEndDate('');
+  }
 
   return (
     <main className="sales">
@@ -483,7 +526,75 @@ export function Sales() {
               Outro
             </option>
           </select>
+
+          <div className="sales__date-filter">
+            <CalendarDays size={18} />
+
+            <label htmlFor="saleStartDate">
+              De
+            </label>
+
+            <input
+              id="saleStartDate"
+              type="date"
+              value={startDate}
+              max={endDate || undefined}
+              onChange={(event) =>
+                setStartDate(
+                  event.target.value,
+                )
+              }
+              aria-label="Data inicial da venda"
+              disabled={isLoading}
+            />
+          </div>
+
+          <div className="sales__date-filter">
+            <CalendarDays size={18} />
+
+            <label htmlFor="saleEndDate">
+              Até
+            </label>
+
+            <input
+              id="saleEndDate"
+              type="date"
+              value={endDate}
+              min={startDate || undefined}
+              onChange={(event) =>
+                setEndDate(
+                  event.target.value,
+                )
+              }
+              aria-label="Data final da venda"
+              disabled={isLoading}
+            />
+          </div>
+
+          <button
+            type="button"
+            className="sales__clear-filters"
+            onClick={handleClearFilters}
+            disabled={
+              isLoading ||
+              !hasActiveFilters
+            }
+          >
+            <RotateCcw size={17} />
+
+            Limpar filtros
+          </button>
         </div>
+
+        {isDateRangeInvalid && (
+          <div
+            className="sales__filter-error"
+            role="alert"
+          >
+            A data inicial não pode ser
+            posterior à data final.
+          </div>
+        )}
 
         {loadError && (
           <div
@@ -617,9 +728,7 @@ export function Sales() {
                               title="Visualizar venda"
                               aria-label={`Visualizar venda de ${sale.customerName}`}
                             >
-                              <Eye
-                                size={18}
-                              />
+                              <Eye size={18} />
                             </Link>
                           </td>
                         </tr>
