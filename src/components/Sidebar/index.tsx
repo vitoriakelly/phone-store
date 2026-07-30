@@ -8,8 +8,10 @@ import {
   Users,
   X,
 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
-import { NavLink } from 'react-router-dom';
+import {
+  NavLink,
+  useNavigate,
+} from 'react-router-dom';
 
 import { useAuth } from '../../contexts/AuthContext';
 import { ApiError } from '../../services/api';
@@ -103,6 +105,7 @@ export function Sidebar({
 
         <NavLink
           to="/dispositivos"
+          end
           onClick={onClose}
           className={({ isActive }) =>
             `sidebar__link ${
@@ -119,6 +122,7 @@ export function Sidebar({
 
         <NavLink
           to="/dispositivos/cadastrar"
+          end
           onClick={onClose}
           className={({ isActive }) =>
             `sidebar__link ${
