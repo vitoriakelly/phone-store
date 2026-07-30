@@ -12,6 +12,22 @@ export type PaymentMethod =
   | 'TROCA_DISPOSITIVO'
   | 'OUTRO';
 
+export interface SalePayment {
+  id: string;
+  saleId: string;
+  method: PaymentMethod;
+  amount: number;
+  installments: number | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SalePaymentInput {
+  method: PaymentMethod;
+  amount: number;
+  installments?: number | null;
+}
+
 export interface TradeInDevice {
   id: string;
   brand: string;
@@ -59,18 +75,16 @@ export interface CreateSaleInput {
   customerSocialNetwork: string;
 
   salePrice: number;
-  paymentMethod: PaymentMethod;
+  payments: SalePaymentInput[];
   soldAt: string;
 
   notes?: string | null;
-
   tradeInDevice?: TradeInDeviceInput;
 }
 
 export interface Sale {
   id: string;
   deviceId: string;
-
   tradeInDeviceId: string | null;
 
   deviceBrand: string;
@@ -90,9 +104,15 @@ export interface Sale {
   customerAddressNumber: string | null;
   customerSocialNetwork: string | null;
 
+  /**
+   * Campo legado retornado pelo backend.
+   * Representa apenas o primeiro pagamento.
+   */
   paymentMethod: PaymentMethod;
-  soldAt: string;
 
+  payments: SalePayment[];
+
+  soldAt: string;
   notes: string | null;
 
   tradeInDevice: TradeInDevice | null;

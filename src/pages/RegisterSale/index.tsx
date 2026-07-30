@@ -3,9 +3,12 @@ import {
   ArrowLeft,
   BadgeDollarSign,
   MapPin,
+  Plus,
   Repeat2,
   Smartphone,
+  Trash2,
   UserRound,
+  WalletCards,
 } from 'lucide-react';
 import {
   useEffect,
@@ -13,6 +16,7 @@ import {
 } from 'react';
 import {
   type FieldPath,
+  useFieldArray,
   useForm,
 } from 'react-hook-form';
 import {
@@ -29,7 +33,10 @@ import { ApiError } from '../../services/api';
 import { getDeviceById } from '../../services/deviceApi';
 import { createSale } from '../../services/saleApi';
 import type { Device } from '../../types/device';
-import type { TradeInDeviceInput } from '../../types/sale';
+import type {
+  PaymentMethod,
+  TradeInDeviceInput,
+} from '../../types/sale';
 import { formatCurrency } from '../../utils/currency';
 
 import './styles.scss';
@@ -38,24 +45,43 @@ function getCurrentDate() {
   const currentDate = new Date();
 
   const timezoneOffset =
-    currentDate.getTimezoneOffset() *
-    60_000;
+    currentDate.getTimezoneOffset() * 60_000;
 
   return new Date(
-    currentDate.getTime() -
-      timezoneOffset,
+    currentDate.getTime() - timezoneOffset,
   )
     .toISOString()
     .split('T')[0];
 }
 
+function convertToCents(value: number) {
+  return Math.round(value * 100);
+}
+
+function getNumericValue(
+  value: number | undefined,
+) {
+  if (
+    value === undefined ||
+    !Number.isFinite(value)
+  ) {
+    return 0;
+  }
+
+  return value;
+}
+
 function buildTradeInDevice(
   data: SaleFormData,
 ): TradeInDeviceInput | undefined {
-  if (
-    data.paymentMethod !==
-    'TROCA_DISPOSITIVO'
-  ) {
+  const hasTradePayment =
+    data.payments.some(
+      (payment) =>
+        payment.method ===
+        'TROCA_DISPOSITIVO',
+    );
+
+  if (!hasTradePayment) {
     return undefined;
   }
 
@@ -77,12 +103,8 @@ function buildTradeInDevice(
   }
 
   return {
-    brand:
-      tradeInDevice.brand.trim(),
-
-    model:
-      tradeInDevice.model.trim(),
-
+    brand: tradeInDevice.brand.trim(),
+    model: tradeInDevice.model.trim(),
     storage:
       tradeInDevice.storage.trim(),
 
@@ -135,9 +157,12 @@ export function RegisterSale() {
     useState('');
 
   const {
+    control,
     register,
     reset,
     setError,
+    setValue,
+    clearErrors,
     watch,
     handleSubmit,
 
@@ -147,6 +172,13 @@ export function RegisterSale() {
     },
   } = useForm<SaleFormData>({
     resolver: zodResolver(saleSchema),
+
+    /*
+     * Quando a seção de troca for removida
+     * da tela, seus campos também deixam
+     * de ser enviados.
+     */
+    shouldUnregister: true,
 
     defaultValues: {
       customerName: '',
@@ -160,7 +192,15 @@ export function RegisterSale() {
       customerSocialNetwork: '',
 
       salePrice: undefined,
-      paymentMethod: 'PIX',
+
+      payments: [
+        {
+          method: 'PIX',
+          amount: 0,
+          installments: undefined,
+        },
+      ],
+
       soldAt: getCurrentDate(),
       notes: '',
 
@@ -170,22 +210,81 @@ export function RegisterSale() {
         storage: '',
         color: '',
         imei: '',
-        batteryHealth: undefined,
+
+        batteryHealth:
+          undefined,
+
         condition: 'SEMINOVO',
-        purchasePrice: undefined,
-        salePrice: undefined,
-        entryDate: getCurrentDate(),
+
+        purchasePrice:
+          undefined,
+
+        salePrice:
+          undefined,
+
+        entryDate:
+          getCurrentDate(),
+
         notes: '',
       },
     },
   });
 
-  const paymentMethod =
-    watch('paymentMethod');
+  const {
+    fields: paymentFields,
+    append: appendPayment,
+    remove: removePayment,
+  } = useFieldArray({
+    control,
+    name: 'payments',
+  });
 
-  const isTradeIn =
-    paymentMethod ===
-    'TROCA_DISPOSITIVO';
+  const watchedSalePrice =
+    watch('salePrice');
+
+  const watchedPayments =
+    watch('payments') ?? [];
+
+  const salePrice =
+    getNumericValue(
+      watchedSalePrice,
+    );
+
+  const totalReceived =
+    watchedPayments.reduce(
+      (total, payment) =>
+        total +
+        getNumericValue(
+          payment?.amount,
+        ),
+      0,
+    );
+
+  const differenceInCents =
+    convertToCents(salePrice) -
+    convertToCents(totalReceived);
+
+  const remainingValue =
+    differenceInCents / 100;
+
+  const hasTradePayment =
+    watchedPayments.some(
+      (payment) =>
+        payment?.method ===
+        'TROCA_DISPOSITIVO',
+    );
+
+  const tradePaymentIndex =
+    watchedPayments.findIndex(
+      (payment) =>
+        payment?.method ===
+        'TROCA_DISPOSITIVO',
+    );
+
+  const paymentTotalIsValid =
+    salePrice > 0 &&
+    totalReceived > 0 &&
+    differenceInCents === 0;
 
   useEffect(() => {
     let isMounted = true;
@@ -219,6 +318,9 @@ export function RegisterSale() {
 
         setDevice(apiDevice);
 
+        const announcedPrice =
+          apiDevice.salePrice ?? 0;
+
         reset({
           customerName: '',
           customerPhone: '',
@@ -234,7 +336,14 @@ export function RegisterSale() {
             apiDevice.salePrice ??
             undefined,
 
-          paymentMethod: 'PIX',
+          payments: [
+            {
+              method: 'PIX',
+              amount: announcedPrice,
+              installments: undefined,
+            },
+          ],
+
           soldAt: getCurrentDate(),
           notes: '',
 
@@ -307,6 +416,127 @@ export function RegisterSale() {
     };
   }, [id, reset]);
 
+  function handleAddPayment() {
+    if (paymentFields.length >= 10) {
+      setSubmitError(
+        'Uma venda pode possuir no máximo 10 pagamentos.',
+      );
+
+      return;
+    }
+
+    setSubmitError('');
+
+    appendPayment({
+      method: 'PIX',
+      amount: 0,
+      installments: undefined,
+    });
+  }
+
+  function handleRemovePayment(
+    index: number,
+  ) {
+    if (paymentFields.length === 1) {
+      setSubmitError(
+        'A venda precisa possuir pelo menos uma forma de pagamento.',
+      );
+
+      return;
+    }
+
+    const removedPayment =
+      watchedPayments[index];
+
+    removePayment(index);
+    setSubmitError('');
+
+    if (
+      removedPayment?.method ===
+      'TROCA_DISPOSITIVO'
+    ) {
+      setValue(
+        'tradeInDevice.purchasePrice',
+        undefined,
+      );
+    }
+
+    clearErrors('payments');
+  }
+
+  function handlePaymentMethodChange(
+    index: number,
+    method: PaymentMethod,
+  ) {
+    if (
+      method !==
+      'CARTAO_CREDITO'
+    ) {
+      setValue(
+        `payments.${index}.installments`,
+        undefined,
+        {
+          shouldValidate: true,
+        },
+      );
+    }
+
+    if (
+      method ===
+      'TROCA_DISPOSITIVO'
+    ) {
+      const currentAmount =
+        getNumericValue(
+          watchedPayments[index]
+            ?.amount,
+        );
+
+      setValue(
+        'tradeInDevice.purchasePrice',
+        currentAmount > 0
+          ? currentAmount
+          : undefined,
+        {
+          shouldValidate: true,
+        },
+      );
+    }
+
+    clearErrors('payments');
+  }
+
+  function handlePaymentAmountChange(
+    index: number,
+    rawValue: string,
+  ) {
+    const paymentMethod =
+      watchedPayments[index]
+        ?.method;
+
+    if (
+      paymentMethod !==
+      'TROCA_DISPOSITIVO'
+    ) {
+      return;
+    }
+
+    const amount =
+      rawValue === ''
+        ? undefined
+        : Number(rawValue);
+
+    setValue(
+      'tradeInDevice.purchasePrice',
+      amount &&
+        Number.isFinite(amount)
+        ? amount
+        : undefined,
+      {
+        shouldValidate: true,
+      },
+    );
+  }
+
   async function handleRegisterSale(
     data: SaleFormData,
   ) {
@@ -319,9 +549,15 @@ export function RegisterSale() {
     const tradeInDevice =
       buildTradeInDevice(data);
 
+    const hasTrade =
+      data.payments.some(
+        (payment) =>
+          payment.method ===
+          'TROCA_DISPOSITIVO',
+      );
+
     if (
-      data.paymentMethod ===
-        'TROCA_DISPOSITIVO' &&
+      hasTrade &&
       !tradeInDevice
     ) {
       setSubmitError(
@@ -362,8 +598,22 @@ export function RegisterSale() {
 
         salePrice: data.salePrice,
 
-        paymentMethod:
-          data.paymentMethod,
+        payments:
+          data.payments.map(
+            (payment) => ({
+              method:
+                payment.method,
+
+              amount:
+                payment.amount,
+
+              installments:
+                payment.method ===
+                'CARTAO_CREDITO'
+                  ? payment.installments
+                  : undefined,
+            }),
+          ),
 
         soldAt: data.soldAt,
 
@@ -377,8 +627,7 @@ export function RegisterSale() {
       navigate('/dispositivos', {
         state: {
           successMessage:
-            data.paymentMethod ===
-            'TROCA_DISPOSITIVO'
+            hasTrade
               ? 'Venda registrada e dispositivo recebido adicionado ao estoque.'
               : 'Venda registrada com sucesso.',
         },
@@ -387,51 +636,47 @@ export function RegisterSale() {
       if (
         error instanceof ApiError
       ) {
-        const formFields: Array<
-          FieldPath<SaleFormData>
-        > = [
-          'customerName',
-          'customerPhone',
-          'customerZipCode',
-          'customerStreet',
-          'customerNeighborhood',
-          'customerCity',
-          'customerAddressNumber',
-          'customerSocialNetwork',
-          'salePrice',
-          'paymentMethod',
-          'soldAt',
-          'notes',
-
-          'tradeInDevice.brand',
-          'tradeInDevice.model',
-          'tradeInDevice.storage',
-          'tradeInDevice.color',
-          'tradeInDevice.imei',
-          'tradeInDevice.batteryHealth',
-          'tradeInDevice.condition',
-          'tradeInDevice.purchasePrice',
-          'tradeInDevice.salePrice',
-          'tradeInDevice.entryDate',
-          'tradeInDevice.notes',
-        ];
+        const serverErrors =
+          error.errors ?? {};
 
         let hasFieldError = false;
 
-        for (const field of formFields) {
-          const fieldMessage =
-            error.errors?.[field]?.[0];
+        for (
+          const [
+            field,
+            messages,
+          ] of Object.entries(
+            serverErrors,
+          )
+        ) {
+          const message =
+            messages?.[0];
 
-          if (!fieldMessage) {
+          if (!message) {
             continue;
           }
 
+          /*
+           * Aceita tanto:
+           * payments.0.amount
+           * quanto:
+           * payments[0].amount
+           */
+          const normalizedField =
+            field.replace(
+              /\[(\d+)\]/g,
+              '.$1',
+            );
+
           hasFieldError = true;
 
-          setError(field, {
-            type: 'server',
-            message: fieldMessage,
-          });
+          setError(
+            normalizedField as FieldPath<SaleFormData>,
+            {
+              type: 'server',
+              message,
+            },
+          );
         }
 
         if (!hasFieldError) {
@@ -492,7 +737,6 @@ export function RegisterSale() {
 
           <Link to="/dispositivos">
             <ArrowLeft size={18} />
-
             Voltar para dispositivos
           </Link>
         </section>
@@ -519,7 +763,6 @@ export function RegisterSale() {
             to={`/dispositivos/${device.id}`}
           >
             <ArrowLeft size={18} />
-
             Voltar para os detalhes
           </Link>
         </section>
@@ -555,7 +798,6 @@ export function RegisterSale() {
             to={`/dispositivos/${device.id}/editar`}
           >
             <ArrowLeft size={18} />
-
             Completar cadastro
           </Link>
         </section>
@@ -585,7 +827,6 @@ export function RegisterSale() {
             to={`/dispositivos/${device.id}`}
           >
             <ArrowLeft size={18} />
-
             Voltar para os detalhes
           </Link>
         </section>
@@ -602,7 +843,6 @@ export function RegisterSale() {
             className="register-sale__back"
           >
             <ArrowLeft size={18} />
-
             Voltar para os detalhes
           </Link>
 
@@ -610,7 +850,7 @@ export function RegisterSale() {
 
           <p>
             Informe os dados da venda,
-            do comprador e da negociação.
+            do comprador e dos pagamentos.
           </p>
         </div>
 
@@ -664,9 +904,7 @@ export function RegisterSale() {
             <UserRound size={22} />
 
             <div>
-              <h2>
-                Dados do comprador
-              </h2>
+              <h2>Dados do comprador</h2>
 
               <p>
                 Identificação e contato
@@ -925,8 +1163,8 @@ export function RegisterSale() {
               </h2>
 
               <p>
-                Valor, forma de pagamento
-                e data da negociação.
+                Valor final e data da
+                negociação.
               </p>
             </div>
           </div>
@@ -953,9 +1191,7 @@ export function RegisterSale() {
                       ) =>
                         value === ''
                           ? undefined
-                          : Number(
-                              value,
-                            ),
+                          : Number(value),
                     },
                   )}
                 />
@@ -965,56 +1201,6 @@ export function RegisterSale() {
                 <span className="register-sale__error">
                   {
                     errors.salePrice
-                      .message
-                  }
-                </span>
-              )}
-            </div>
-
-            <div className="register-sale__field">
-              <label htmlFor="paymentMethod">
-                Forma de pagamento *
-              </label>
-
-              <select
-                id="paymentMethod"
-                {...register(
-                  'paymentMethod',
-                )}
-              >
-                <option value="PIX">
-                  Pix
-                </option>
-
-                <option value="DINHEIRO">
-                  Dinheiro
-                </option>
-
-                <option value="CARTAO_CREDITO">
-                  Cartão de crédito
-                </option>
-
-                <option value="CARTAO_DEBITO">
-                  Cartão de débito
-                </option>
-
-                <option value="TRANSFERENCIA">
-                  Transferência
-                </option>
-
-                <option value="TROCA_DISPOSITIVO">
-                  Troca de dispositivo
-                </option>
-
-                <option value="OUTRO">
-                  Outro
-                </option>
-              </select>
-
-              {errors.paymentMethod && (
-                <span className="register-sale__error">
-                  {
-                    errors.paymentMethod
                       .message
                   }
                 </span>
@@ -1041,7 +1227,345 @@ export function RegisterSale() {
           </div>
         </section>
 
-        {isTradeIn && (
+        <section className="register-sale__section">
+          <div className="register-sale__section-heading">
+            <WalletCards size={22} />
+
+            <div>
+              <h2>Formas de pagamento</h2>
+
+              <p>
+                Adicione uma ou mais
+                formas de pagamento. A
+                soma deve ser igual ao
+                valor final da venda.
+              </p>
+            </div>
+          </div>
+
+          {paymentFields.map(
+            (paymentField, index) => {
+              const currentMethod =
+                watchedPayments[index]
+                  ?.method ??
+                paymentField.method;
+
+              const anotherTradeExists =
+                tradePaymentIndex !== -1 &&
+                tradePaymentIndex !==
+                  index;
+
+              return (
+                <div
+                  key={paymentField.id}
+                  className="register-sale__payment"
+                >
+                  <div className="register-sale__grid">
+                    <div className="register-sale__field">
+                      <label
+                        htmlFor={`paymentMethod-${index}`}
+                      >
+                        Forma de pagamento *
+                      </label>
+
+                      <select
+                        id={`paymentMethod-${index}`}
+                        {...register(
+                          `payments.${index}.method`,
+                          {
+                            onChange: (
+                              event,
+                            ) =>
+                              handlePaymentMethodChange(
+                                index,
+                                event
+                                  .target
+                                  .value as PaymentMethod,
+                              ),
+                          },
+                        )}
+                      >
+                        <option value="PIX">
+                          Pix
+                        </option>
+
+                        <option value="DINHEIRO">
+                          Dinheiro
+                        </option>
+
+                        <option value="CARTAO_CREDITO">
+                          Cartão de crédito
+                        </option>
+
+                        <option value="CARTAO_DEBITO">
+                          Cartão de débito
+                        </option>
+
+                        <option value="TRANSFERENCIA">
+                          Transferência
+                        </option>
+
+                        <option
+                          value="TROCA_DISPOSITIVO"
+                          disabled={
+                            anotherTradeExists
+                          }
+                        >
+                          Troca de dispositivo
+                        </option>
+
+                        <option value="OUTRO">
+                          Outro
+                        </option>
+                      </select>
+
+                      {errors.payments?.[
+                        index
+                      ]?.method && (
+                        <span className="register-sale__error">
+                          {
+                            errors
+                              .payments[
+                                index
+                              ]?.method
+                              ?.message
+                          }
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="register-sale__field">
+                      <label
+                        htmlFor={`paymentAmount-${index}`}
+                      >
+                        Valor recebido *
+                      </label>
+
+                      <div className="register-sale__input-prefix">
+                        <span>R$</span>
+
+                        <input
+                          id={`paymentAmount-${index}`}
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          {...register(
+                            `payments.${index}.amount`,
+                            {
+                              setValueAs: (
+                                value,
+                              ) =>
+                                value === ''
+                                  ? undefined
+                                  : Number(
+                                      value,
+                                    ),
+
+                              onChange: (
+                                event,
+                              ) =>
+                                handlePaymentAmountChange(
+                                  index,
+                                  event
+                                    .target
+                                    .value,
+                                ),
+                            },
+                          )}
+                        />
+                      </div>
+
+                      {errors.payments?.[
+                        index
+                      ]?.amount && (
+                        <span className="register-sale__error">
+                          {
+                            errors
+                              .payments[
+                                index
+                              ]?.amount
+                              ?.message
+                          }
+                        </span>
+                      )}
+                    </div>
+
+                    {currentMethod ===
+                      'CARTAO_CREDITO' && (
+                      <div className="register-sale__field">
+                        <label
+                          htmlFor={`paymentInstallments-${index}`}
+                        >
+                          Parcelas *
+                        </label>
+
+                        <input
+                          id={`paymentInstallments-${index}`}
+                          type="number"
+                          min="1"
+                          max="36"
+                          step="1"
+                          placeholder="Ex.: 5"
+                          {...register(
+                            `payments.${index}.installments`,
+                            {
+                              setValueAs: (
+                                value,
+                              ) =>
+                                value === ''
+                                  ? undefined
+                                  : Number(
+                                      value,
+                                    ),
+                            },
+                          )}
+                        />
+
+                        {errors.payments?.[
+                          index
+                        ]?.installments && (
+                          <span className="register-sale__error">
+                            {
+                              errors
+                                .payments[
+                                  index
+                                ]
+                                ?.installments
+                                ?.message
+                            }
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  <button
+                    type="button"
+                    className="register-sale__remove-payment"
+                    onClick={() =>
+                      handleRemovePayment(
+                        index,
+                      )
+                    }
+                    disabled={
+                      paymentFields.length ===
+                      1
+                    }
+                  >
+                    <Trash2 size={17} />
+
+                    Remover pagamento
+                  </button>
+                </div>
+              );
+            },
+          )}
+
+          {errors.payments?.root
+            ?.message && (
+            <span className="register-sale__error">
+              {
+                errors.payments.root
+                  .message
+              }
+            </span>
+          )}
+
+          <button
+            type="button"
+            className="register-sale__add-payment"
+            onClick={
+              handleAddPayment
+            }
+            disabled={
+              paymentFields.length >= 10
+            }
+          >
+            <Plus size={18} />
+
+            Adicionar forma de pagamento
+          </button>
+
+          <div className="register-sale__payment-summary">
+            <div>
+              <span>Valor da venda</span>
+
+              <strong>
+                {formatCurrency(
+                  salePrice,
+                )}
+              </strong>
+            </div>
+
+            <div>
+              <span>Total recebido</span>
+
+              <strong>
+                {formatCurrency(
+                  totalReceived,
+                )}
+              </strong>
+            </div>
+
+            <div>
+              <span>
+                {differenceInCents > 0
+                  ? 'Valor restante'
+                  : differenceInCents < 0
+                    ? 'Valor excedente'
+                    : 'Situação'}
+              </span>
+
+              <strong>
+                {differenceInCents > 0
+                  ? formatCurrency(
+                      remainingValue,
+                    )
+                  : differenceInCents < 0
+                    ? formatCurrency(
+                        Math.abs(
+                          remainingValue,
+                        ),
+                      )
+                    : salePrice > 0
+                      ? 'Pagamento completo'
+                      : 'Informe os valores'}
+              </strong>
+            </div>
+          </div>
+
+          {differenceInCents > 0 && (
+            <div
+              className="register-sale__submit-error"
+              role="status"
+            >
+              Ainda faltam{' '}
+              {formatCurrency(
+                remainingValue,
+              )}{' '}
+              para completar o valor da
+              venda.
+            </div>
+          )}
+
+          {differenceInCents < 0 && (
+            <div
+              className="register-sale__submit-error"
+              role="status"
+            >
+              Os pagamentos excedem o
+              valor da venda em{' '}
+              {formatCurrency(
+                Math.abs(
+                  remainingValue,
+                ),
+              )}
+              .
+            </div>
+          )}
+        </section>
+
+        {hasTradePayment && (
           <section className="register-sale__section">
             <div className="register-sale__section-heading">
               <Repeat2 size={22} />
@@ -1311,7 +1835,8 @@ export function RegisterSale() {
 
               <div className="register-sale__field">
                 <label htmlFor="tradeInPurchasePrice">
-                  Valor de compra *
+                  Valor considerado na
+                  troca *
                 </label>
 
                 <div className="register-sale__input-prefix">
@@ -1322,6 +1847,7 @@ export function RegisterSale() {
                     type="number"
                     min="0"
                     step="0.01"
+                    readOnly
                     {...register(
                       'tradeInDevice.purchasePrice',
                       {
@@ -1337,6 +1863,12 @@ export function RegisterSale() {
                     )}
                   />
                 </div>
+
+                <small>
+                  Este valor acompanha
+                  automaticamente o
+                  pagamento por troca.
+                </small>
 
                 {errors.tradeInDevice
                   ?.purchasePrice && (
@@ -1378,7 +1910,7 @@ export function RegisterSale() {
 
               <div className="register-sale__field">
                 <label htmlFor="tradeInSalePrice">
-                  Valor de venda
+                  Valor futuro de venda
                 </label>
 
                 <div className="register-sale__input-prefix">
@@ -1448,7 +1980,9 @@ export function RegisterSale() {
 
         <section className="register-sale__section">
           <div className="register-sale__section-heading">
-            <h2>Observações da venda</h2>
+            <h2>
+              Observações da venda
+            </h2>
 
             <p>
               Informações adicionais sobre
@@ -1464,7 +1998,7 @@ export function RegisterSale() {
             <textarea
               id="notes"
               rows={5}
-              placeholder="Ex.: Pagamento dividido entre Pix e cartão."
+              placeholder="Ex.: R$ 1.200 em troca, R$ 800 em dinheiro e o restante no cartão."
               {...register('notes')}
             />
 
@@ -1496,13 +2030,18 @@ export function RegisterSale() {
           <button
             type="submit"
             className="register-sale__submit"
-            disabled={isSubmitting}
+            disabled={
+              isSubmitting ||
+              !paymentTotalIsValid
+            }
           >
             <BadgeDollarSign size={19} />
 
             {isSubmitting
               ? 'Registrando...'
-              : 'Confirmar venda'}
+              : paymentTotalIsValid
+                ? 'Confirmar venda'
+                : 'Complete o pagamento'}
           </button>
         </footer>
       </form>

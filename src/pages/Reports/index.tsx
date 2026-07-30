@@ -12,6 +12,7 @@ import {
 import {
   type FormEvent,
   useEffect,
+  useMemo,
   useState,
 } from 'react';
 import { Link } from 'react-router-dom';
@@ -31,12 +32,17 @@ import type {
 import type {
   PaymentMethod,
   Sale,
+  SalePayment,
 } from '../../types/sale';
 import { formatCurrency } from '../../utils/currency';
 
 import './styles.scss';
 
 type ReportTab = 'sales' | 'devices';
+
+type PaymentFilter =
+  | 'TODOS'
+  | PaymentMethod;
 
 const initialSalesFilters: SalesReportFilters = {
   startDate: '',
@@ -136,6 +142,84 @@ function getPaymentMethodLabel(
 
   return labels[paymentMethod];
 }
+function getSalePayments(
+  sale: Sale,
+): SalePayment[] {
+  if (sale.payments?.length > 0) {
+    return sale.payments;
+  }
+
+  return [
+    {
+      id: `legacy-${sale.id}`,
+      saleId: sale.id,
+      method: sale.paymentMethod,
+      amount: sale.salePrice,
+      installments: null,
+      createdAt: sale.createdAt,
+      updatedAt: sale.updatedAt,
+    },
+  ];
+}
+
+function getPaymentDescription(
+  payment: SalePayment,
+) {
+  const label =
+    getPaymentMethodLabel(
+      payment.method,
+    );
+
+  if (
+    payment.method ===
+      'CARTAO_CREDITO' &&
+    payment.installments
+  ) {
+    return `${label} em ${payment.installments}x`;
+  }
+
+  return label;
+}
+
+function getPaymentSummary(
+  sale: Sale,
+) {
+  const payments =
+    getSalePayments(sale);
+
+  const descriptions =
+    payments.map(
+      getPaymentDescription,
+    );
+
+  if (descriptions.length === 1) {
+    return descriptions[0];
+  }
+
+  if (descriptions.length === 2) {
+    return descriptions.join(' + ');
+  }
+
+  return `${descriptions
+    .slice(0, 2)
+    .join(' + ')} +${
+    descriptions.length - 2
+  }`;
+}
+
+function saleHasPaymentMethod(
+  sale: Sale,
+  paymentMethod: PaymentMethod,
+) {
+  return getSalePayments(
+    sale,
+  ).some(
+    (payment) =>
+      payment.method ===
+      paymentMethod,
+  );
+}
+
 function getDeviceStatusLabel(
   status: Device['status'],
 ) {
@@ -206,6 +290,13 @@ export function Reports() {
     setDevicesFilters,
   ] = useState<DevicesReportFilters>(
     initialDevicesFilters,
+  );
+
+  const [
+    salesPaymentFilter,
+    setSalesPaymentFilter,
+  ] = useState<PaymentFilter>(
+    'TODOS',
   );
 
   const [sales, setSales] =
@@ -335,6 +426,10 @@ export function Reports() {
       initialSalesFilters,
     );
 
+    setSalesPaymentFilter(
+      'TODOS',
+    );
+
     void loadSalesReport(
       initialSalesFilters,
     );
@@ -350,13 +445,80 @@ export function Reports() {
     );
   }
 
+  const filteredSales =
+    useMemo(() => {
+      if (
+        salesPaymentFilter ===
+        'TODOS'
+      ) {
+        return sales;
+      }
+
+      return sales.filter(
+        (sale) =>
+          saleHasPaymentMethod(
+            sale,
+            salesPaymentFilter,
+          ),
+      );
+    }, [
+      sales,
+      salesPaymentFilter,
+    ]);
+
+  const displayedSalesMeta =
+    useMemo<SalesReportMeta>(() => {
+      if (
+        salesPaymentFilter ===
+        'TODOS'
+      ) {
+        return salesMeta;
+      }
+
+      const total =
+        filteredSales.length;
+
+      const totalRevenue =
+        filteredSales.reduce(
+          (sum, sale) =>
+            sum + sale.salePrice,
+          0,
+        );
+
+      const totalCost =
+        filteredSales.reduce(
+          (sum, sale) =>
+            sum + sale.purchasePrice,
+          0,
+        );
+
+      const totalProfit =
+        totalRevenue - totalCost;
+
+      return {
+        total,
+        totalRevenue,
+        totalCost,
+        totalProfit,
+
+        averageTicket:
+          total > 0
+            ? totalRevenue / total
+            : 0,
+      };
+    }, [
+      filteredSales,
+      salesMeta,
+      salesPaymentFilter,
+    ]);
+
   function handlePrintReport() {
     const isSalesReport =
       activeTab === 'sales';
 
     const hasNoData =
       isSalesReport
-        ? sales.length === 0
+        ? filteredSales.length === 0
         : devices.length === 0;
 
     if (hasNoData) {
@@ -402,7 +564,7 @@ export function Reports() {
             <article>
               <span>Vendas encontradas</span>
               <strong>
-                ${salesMeta.total}
+                ${displayedSalesMeta.total}
               </strong>
             </article>
 
@@ -411,7 +573,7 @@ export function Reports() {
               <strong>
                 ${escapeHtml(
           formatCurrency(
-            salesMeta.totalRevenue,
+            displayedSalesMeta.totalRevenue,
           ),
         )}
               </strong>
@@ -422,7 +584,7 @@ export function Reports() {
               <strong>
                 ${escapeHtml(
           formatCurrency(
-            salesMeta.totalCost,
+            displayedSalesMeta.totalCost,
           ),
         )}
               </strong>
@@ -433,7 +595,7 @@ export function Reports() {
               <strong>
                 ${escapeHtml(
           formatCurrency(
-            salesMeta.totalProfit,
+            displayedSalesMeta.totalProfit,
           ),
         )}
               </strong>
@@ -444,7 +606,7 @@ export function Reports() {
               <strong>
                 ${escapeHtml(
           formatCurrency(
-            salesMeta.averageTicket,
+            displayedSalesMeta.averageTicket,
           ),
         )}
               </strong>
@@ -530,7 +692,7 @@ export function Reports() {
 
     const tableRows =
       isSalesReport
-        ? sales
+        ? filteredSales
           .map((sale) => {
             const profit =
               sale.salePrice -
@@ -566,8 +728,8 @@ export function Reports() {
 
                   <td>
                     ${escapeHtml(
-              getPaymentMethodLabel(
-                sale.paymentMethod,
+              getPaymentSummary(
+                sale,
               ),
             )}
                   </td>
@@ -1004,8 +1166,9 @@ export function Reports() {
 
                 <p>
                   Pesquise por período,
-                  comprador, IMEI ou
-                  dispositivo.
+                  comprador, IMEI,
+                  dispositivo ou forma de
+                  pagamento.
                 </p>
               </div>
 
@@ -1137,6 +1300,56 @@ export function Reports() {
                 />
               </label>
 
+              <label>
+                <span>
+                  Forma de pagamento
+                </span>
+
+                <select
+                  value={
+                    salesPaymentFilter
+                  }
+                  onChange={(event) =>
+                    setSalesPaymentFilter(
+                      event.target
+                        .value as PaymentFilter,
+                    )
+                  }
+                >
+                  <option value="TODOS">
+                    Todas
+                  </option>
+
+                  <option value="PIX">
+                    Pix
+                  </option>
+
+                  <option value="DINHEIRO">
+                    Dinheiro
+                  </option>
+
+                  <option value="CARTAO_CREDITO">
+                    Cartão de crédito
+                  </option>
+
+                  <option value="CARTAO_DEBITO">
+                    Cartão de débito
+                  </option>
+
+                  <option value="TRANSFERENCIA">
+                    Transferência
+                  </option>
+
+                  <option value="TROCA_DISPOSITIVO">
+                    Troca de dispositivo
+                  </option>
+
+                  <option value="OUTRO">
+                    Outro
+                  </option>
+                </select>
+              </label>
+
               <div className="reports__filter-actions">
                 <button
                   type="button"
@@ -1176,7 +1389,7 @@ export function Reports() {
                 </span>
 
                 <strong>
-                  {salesMeta.total}
+                  {displayedSalesMeta.total}
                 </strong>
               </div>
             </article>
@@ -1191,7 +1404,7 @@ export function Reports() {
 
                 <strong>
                   {formatCurrency(
-                    salesMeta
+                    displayedSalesMeta
                       .totalRevenue,
                   )}
                 </strong>
@@ -1206,7 +1419,7 @@ export function Reports() {
 
                 <strong>
                   {formatCurrency(
-                    salesMeta
+                    displayedSalesMeta
                       .totalProfit,
                   )}
                 </strong>
@@ -1223,7 +1436,7 @@ export function Reports() {
 
                 <strong>
                   {formatCurrency(
-                    salesMeta
+                    displayedSalesMeta
                       .averageTicket,
                   )}
                 </strong>
@@ -1253,7 +1466,7 @@ export function Reports() {
                 }
                 disabled={
                   isLoading ||
-                  sales.length === 0
+                  filteredSales.length === 0
                 }
                 aria-label="Imprimir relatório de vendas"
                 title="Imprimir relatório"
@@ -1266,7 +1479,7 @@ export function Reports() {
               <div className="reports__state">
                 Carregando vendas...
               </div>
-            ) : sales.length > 0 ? (
+            ) : filteredSales.length > 0 ? (
               <div className="reports__table-container">
                 <table className="reports__table">
                   <thead>
@@ -1283,7 +1496,7 @@ export function Reports() {
                   </thead>
 
                   <tbody>
-                    {sales.map(
+                    {filteredSales.map(
                       (sale) => {
                         const profit =
                           sale.salePrice -
@@ -1321,8 +1534,8 @@ export function Reports() {
                             </td>
 
                             <td>
-                              {getPaymentMethodLabel(
-                                sale.paymentMethod,
+                              {getPaymentSummary(
+                                sale,
                               )}
                             </td>
 

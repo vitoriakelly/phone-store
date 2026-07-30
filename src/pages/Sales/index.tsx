@@ -21,6 +21,7 @@ import {
 import type {
   PaymentMethod,
   Sale,
+  SalePayment,
 } from '../../types/sale';
 import { formatCurrency } from '../../utils/currency';
 
@@ -48,23 +49,120 @@ function getPaymentMethodLabel(
   paymentMethod: PaymentMethod,
 ) {
   const labels: Record<
-  PaymentMethod,
-  string
-> = {
-  PIX: 'Pix',
-  DINHEIRO: 'Dinheiro',
-  CARTAO_CREDITO:
-    'Cartão de crédito',
-  CARTAO_DEBITO:
-    'Cartão de débito',
-  TRANSFERENCIA:
-    'Transferência',
-  TROCA_DISPOSITIVO:
-    'Troca de dispositivo',
-  OUTRO: 'Outro',
-};
+    PaymentMethod,
+    string
+  > = {
+    PIX: 'Pix',
+    DINHEIRO: 'Dinheiro',
+    CARTAO_CREDITO:
+      'Cartão de crédito',
+    CARTAO_DEBITO:
+      'Cartão de débito',
+    TRANSFERENCIA:
+      'Transferência',
+    TROCA_DISPOSITIVO:
+      'Troca de dispositivo',
+    OUTRO: 'Outro',
+  };
 
   return labels[paymentMethod];
+}
+
+function getSalePayments(
+  sale: Sale,
+): SalePayment[] {
+  if (sale.payments?.length > 0) {
+    return sale.payments;
+  }
+
+  /*
+   * Compatibilidade com vendas antigas
+   * que possuíam apenas paymentMethod.
+   */
+  return [
+    {
+      id: `legacy-${sale.id}`,
+      saleId: sale.id,
+      method: sale.paymentMethod,
+      amount: sale.salePrice,
+      installments: null,
+      createdAt: sale.createdAt,
+      updatedAt: sale.updatedAt,
+    },
+  ];
+}
+
+function getPaymentDescription(
+  payment: SalePayment,
+) {
+  const label =
+    getPaymentMethodLabel(
+      payment.method,
+    );
+
+  if (
+    payment.method ===
+      'CARTAO_CREDITO' &&
+    payment.installments
+  ) {
+    return `${label} em ${payment.installments}x`;
+  }
+
+  return label;
+}
+
+function getPaymentSummary(
+  sale: Sale,
+) {
+  const payments =
+    getSalePayments(sale);
+
+  const descriptions =
+    payments.map(
+      getPaymentDescription,
+    );
+
+  if (descriptions.length === 1) {
+    return descriptions[0];
+  }
+
+  if (descriptions.length === 2) {
+    return descriptions.join(' + ');
+  }
+
+  return `${descriptions
+    .slice(0, 2)
+    .join(' + ')} +${
+    descriptions.length - 2
+  }`;
+}
+
+function getPaymentTitle(
+  sale: Sale,
+) {
+  return getSalePayments(sale)
+    .map(
+      (payment) =>
+        `${getPaymentDescription(
+          payment,
+        )}: ${formatCurrency(
+          payment.amount,
+        )}`,
+    )
+    .join(' | ');
+}
+
+function saleHasPaymentMethod(
+  sale: Sale,
+  paymentMethod: PaymentMethod,
+) {
+  return getSalePayments(
+    sale,
+  ).some(
+    (payment) =>
+      payment.method ===
+      paymentMethod,
+  );
 }
 
 export function Sales() {
@@ -117,7 +215,9 @@ export function Sales() {
         setSales([]);
         setSummary(initialSummary);
 
-        if (error instanceof ApiError) {
+        if (
+          error instanceof ApiError
+        ) {
           setLoadError(
             error.message,
           );
@@ -149,13 +249,26 @@ export function Sales() {
 
       return [...sales]
         .filter((sale) => {
+          const paymentContent =
+            getSalePayments(sale)
+              .map(
+                (payment) =>
+                  getPaymentMethodLabel(
+                    payment.method,
+                  ),
+              )
+              .join(' ');
+
           const searchableContent =
             [
               sale.customerName,
               sale.customerPhone,
+              sale.customerSocialNetwork,
+              sale.customerCity,
               sale.deviceBrand,
               sale.deviceModel,
               sale.deviceImei,
+              paymentContent,
             ]
               .filter(Boolean)
               .join(' ')
@@ -170,8 +283,10 @@ export function Sales() {
           const matchesPayment =
             paymentFilter ===
               'TODOS' ||
-            sale.paymentMethod ===
-              paymentFilter;
+            saleHasPaymentMethod(
+              sale,
+              paymentFilter,
+            );
 
           return (
             matchesSearch &&
@@ -319,7 +434,7 @@ export function Sales() {
                   event.target.value,
                 )
               }
-              placeholder="Pesquisar cliente, aparelho ou IMEI"
+              placeholder="Pesquisar cliente, aparelho, IMEI ou pagamento"
               aria-label="Pesquisar vendas"
               disabled={isLoading}
             />
@@ -360,6 +475,10 @@ export function Sales() {
               Transferência
             </option>
 
+            <option value="TROCA_DISPOSITIVO">
+              Troca de dispositivo
+            </option>
+
             <option value="OUTRO">
               Outro
             </option>
@@ -395,7 +514,7 @@ export function Sales() {
                     <th>Cliente</th>
                     <th>Dispositivo</th>
                     <th>Data</th>
-                    <th>Pagamento</th>
+                    <th>Pagamentos</th>
                     <th>Valor</th>
                     <th>Lucro</th>
                     <th>Ações</th>
@@ -463,9 +582,14 @@ export function Sales() {
                           </td>
 
                           <td>
-                            <span className="sales__payment">
-                              {getPaymentMethodLabel(
-                                sale.paymentMethod,
+                            <span
+                              className="sales__payment"
+                              title={getPaymentTitle(
+                                sale,
+                              )}
+                            >
+                              {getPaymentSummary(
+                                sale,
                               )}
                             </span>
                           </td>
@@ -540,9 +664,14 @@ export function Sales() {
                           </div>
                         </div>
 
-                        <span className="sales__payment">
-                          {getPaymentMethodLabel(
-                            sale.paymentMethod,
+                        <span
+                          className="sales__payment"
+                          title={getPaymentTitle(
+                            sale,
+                          )}
+                        >
+                          {getPaymentSummary(
+                            sale,
                           )}
                         </span>
                       </div>
@@ -586,6 +715,20 @@ export function Sales() {
 
                         <div>
                           <span>
+                            Formas de pagamento
+                          </span>
+
+                          <strong>
+                            {
+                              getSalePayments(
+                                sale,
+                              ).length
+                            }
+                          </strong>
+                        </div>
+
+                        <div>
+                          <span>
                             Valor vendido
                           </span>
 
@@ -597,9 +740,7 @@ export function Sales() {
                         </div>
 
                         <div>
-                          <span>
-                            Lucro
-                          </span>
+                          <span>Lucro</span>
 
                           <strong className="sales__profit">
                             {formatCurrency(
@@ -614,6 +755,7 @@ export function Sales() {
                         className="sales__card-details"
                       >
                         <Eye size={18} />
+
                         Ver detalhes da venda
                       </Link>
                     </article>

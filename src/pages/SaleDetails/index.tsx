@@ -1,13 +1,17 @@
 import {
   ArrowLeft,
+  AtSign,
   BadgeDollarSign,
   CalendarDays,
   CreditCard,
   Hash,
+  MapPin,
   Phone,
   Printer,
+  Repeat2,
   Smartphone,
   UserRound,
+  WalletCards,
 } from 'lucide-react';
 import {
   useEffect,
@@ -23,6 +27,7 @@ import { getSaleById } from '../../services/saleApi';
 import type {
   PaymentMethod,
   Sale,
+  SalePayment,
 } from '../../types/sale';
 import { formatCurrency } from '../../utils/currency';
 
@@ -50,23 +55,89 @@ function getPaymentMethodLabel(
   paymentMethod: PaymentMethod,
 ) {
   const labels: Record<
-  PaymentMethod,
-  string
-> = {
-  PIX: 'Pix',
-  DINHEIRO: 'Dinheiro',
-  CARTAO_CREDITO:
-    'Cartão de crédito',
-  CARTAO_DEBITO:
-    'Cartão de débito',
-  TRANSFERENCIA:
-    'Transferência',
-  TROCA_DISPOSITIVO:
-    'Troca de dispositivo',
-  OUTRO: 'Outro',
-};
+    PaymentMethod,
+    string
+  > = {
+    PIX: 'Pix',
+    DINHEIRO: 'Dinheiro',
+    CARTAO_CREDITO:
+      'Cartão de crédito',
+    CARTAO_DEBITO:
+      'Cartão de débito',
+    TRANSFERENCIA:
+      'Transferência',
+    TROCA_DISPOSITIVO:
+      'Troca de dispositivo',
+    OUTRO: 'Outro',
+  };
 
   return labels[paymentMethod];
+}
+
+function getConditionLabel(
+  condition:
+    | 'NOVO'
+    | 'SEMINOVO'
+    | 'USADO',
+) {
+  const labels = {
+    NOVO: 'Novo',
+    SEMINOVO: 'Seminovo',
+    USADO: 'Usado',
+  };
+
+  return labels[condition];
+}
+
+function getPaymentDescription(
+  payment: SalePayment,
+) {
+  const method =
+    getPaymentMethodLabel(
+      payment.method,
+    );
+
+  if (
+    payment.method ===
+      'CARTAO_CREDITO' &&
+    payment.installments
+  ) {
+    return `${method} em ${payment.installments}x`;
+  }
+
+  return method;
+}
+
+function getCustomerAddress(
+  sale: Sale,
+) {
+  const streetLine = [
+    sale.customerStreet,
+    sale.customerAddressNumber,
+  ]
+    .filter(Boolean)
+    .join(', ');
+
+  const locationLine = [
+    sale.customerNeighborhood,
+    sale.customerCity,
+  ]
+    .filter(Boolean)
+    .join(' — ');
+
+  const addressParts = [
+    streetLine,
+    locationLine,
+    sale.customerZipCode
+      ? `CEP ${sale.customerZipCode}`
+      : '',
+  ].filter(Boolean);
+
+  if (addressParts.length === 0) {
+    return 'Não informado';
+  }
+
+  return addressParts.join(' · ');
 }
 
 export function SaleDetails() {
@@ -161,7 +232,8 @@ export function SaleDetails() {
           <h1>Carregando venda...</h1>
 
           <p>
-            Aguarde enquanto buscamos os dados da venda.
+            Aguarde enquanto buscamos os
+            dados da venda.
           </p>
         </section>
       </main>
@@ -196,6 +268,40 @@ export function SaleDetails() {
     sale.salePrice -
     sale.purchasePrice;
 
+  /*
+   * Compatibilidade com vendas antigas.
+   * Após a migration, normalmente todas
+   * as vendas já possuirão payments.
+   */
+  const payments: SalePayment[] =
+    sale.payments?.length > 0
+      ? sale.payments
+      : [
+          {
+            id: 'legacy-payment',
+            saleId: sale.id,
+            method:
+              sale.paymentMethod,
+            amount: sale.salePrice,
+            installments: null,
+            createdAt:
+              sale.createdAt,
+            updatedAt:
+              sale.updatedAt,
+          },
+        ];
+
+  const totalReceived =
+    payments.reduce(
+      (total, payment) =>
+        total + payment.amount,
+      0,
+    );
+
+  const paymentDifference =
+    sale.salePrice -
+    totalReceived;
+
   return (
     <main className="sale-details">
       <section className="sale-details__heading">
@@ -210,7 +316,9 @@ export function SaleDetails() {
 
           <div className="sale-details__title">
             <div className="sale-details__title-icon">
-              <BadgeDollarSign size={27} />
+              <BadgeDollarSign
+                size={27}
+              />
             </div>
 
             <div>
@@ -218,7 +326,9 @@ export function SaleDetails() {
 
               <p>
                 Venda realizada em{' '}
-                {formatDate(sale.soldAt)}
+                {formatDate(
+                  sale.soldAt,
+                )}
               </p>
             </div>
           </div>
@@ -238,6 +348,7 @@ export function SaleDetails() {
         <header className="sale-details__receipt-header">
           <div>
             <strong>Phone Store</strong>
+
             <span>
               Comprovante de venda
             </span>
@@ -260,11 +371,12 @@ export function SaleDetails() {
         <section className="sale-details__section">
           <div className="sale-details__section-heading">
             <h2>
-              Informações do cliente
+              Informações do comprador
             </h2>
 
             <p>
-              Dados informados no momento da venda.
+              Dados informados no momento
+              da venda.
             </p>
           </div>
 
@@ -274,7 +386,7 @@ export function SaleDetails() {
 
               <div>
                 <span>
-                  Nome do cliente
+                  Nome do comprador
                 </span>
 
                 <strong>
@@ -295,15 +407,45 @@ export function SaleDetails() {
                 </strong>
               </div>
             </article>
+
+            <article className="sale-details__information">
+              <AtSign size={20} />
+
+              <div>
+                <span>Rede social</span>
+
+                <strong>
+                  {sale.customerSocialNetwork ||
+                    'Não informada'}
+                </strong>
+              </div>
+            </article>
+
+            <article className="sale-details__information">
+              <MapPin size={20} />
+
+              <div>
+                <span>Endereço</span>
+
+                <strong>
+                  {getCustomerAddress(
+                    sale,
+                  )}
+                </strong>
+              </div>
+            </article>
           </div>
         </section>
 
         <section className="sale-details__section">
           <div className="sale-details__section-heading">
-            <h2>Dispositivo vendido</h2>
+            <h2>
+              Dispositivo vendido
+            </h2>
 
             <p>
-              Aparelho relacionado a esta venda.
+              Aparelho relacionado a esta
+              venda.
             </p>
           </div>
 
@@ -344,10 +486,13 @@ export function SaleDetails() {
 
         <section className="sale-details__section">
           <div className="sale-details__section-heading">
-            <h2>Informações da venda</h2>
+            <h2>
+              Informações da venda
+            </h2>
 
             <p>
-              Valores e forma de pagamento.
+              Data, valores e resultado da
+              negociação.
             </p>
           </div>
 
@@ -359,23 +504,26 @@ export function SaleDetails() {
                 <span>Data da venda</span>
 
                 <strong>
-                  {formatDate(sale.soldAt)}
+                  {formatDate(
+                    sale.soldAt,
+                  )}
                 </strong>
               </div>
             </article>
 
             <article className="sale-details__information">
-              <CreditCard size={20} />
+              <WalletCards size={20} />
 
               <div>
                 <span>
-                  Forma de pagamento
+                  Formas de pagamento
                 </span>
 
                 <strong>
-                  {getPaymentMethodLabel(
-                    sale.paymentMethod,
-                  )}
+                  {payments.length}{' '}
+                  {payments.length === 1
+                    ? 'pagamento'
+                    : 'pagamentos'}
                 </strong>
               </div>
             </article>
@@ -407,9 +555,7 @@ export function SaleDetails() {
             </article>
 
             <article className="sale-details__price-card">
-              <span>
-                Lucro obtido
-              </span>
+              <span>Lucro obtido</span>
 
               <strong>
                 {formatCurrency(profit)}
@@ -420,10 +566,224 @@ export function SaleDetails() {
 
         <section className="sale-details__section">
           <div className="sale-details__section-heading">
+            <h2>
+              Pagamentos recebidos
+            </h2>
+
+            <p>
+              Composição completa do valor
+              recebido na venda.
+            </p>
+          </div>
+
+          <div className="sale-details__information-grid">
+            {payments.map(
+              (payment, index) => (
+                <article
+                  key={payment.id}
+                  className="sale-details__information"
+                >
+                  <CreditCard size={20} />
+
+                  <div>
+                    <span>
+                      Pagamento{' '}
+                      {index + 1}
+                    </span>
+
+                    <strong>
+                      {getPaymentDescription(
+                        payment,
+                      )}
+                    </strong>
+
+                    <span>
+                      {formatCurrency(
+                        payment.amount,
+                      )}
+                    </span>
+                  </div>
+                </article>
+              ),
+            )}
+          </div>
+
+          <div className="sale-details__price-grid">
+            <article className="sale-details__price-card">
+              <span>Total da venda</span>
+
+              <strong>
+                {formatCurrency(
+                  sale.salePrice,
+                )}
+              </strong>
+            </article>
+
+            <article className="sale-details__price-card">
+              <span>Total recebido</span>
+
+              <strong>
+                {formatCurrency(
+                  totalReceived,
+                )}
+              </strong>
+            </article>
+
+            <article className="sale-details__price-card">
+              <span>
+                Conferência
+              </span>
+
+              <strong>
+                {Math.abs(
+                  paymentDifference,
+                ) < 0.01
+                  ? 'Pagamento completo'
+                  : paymentDifference > 0
+                    ? `Faltam ${formatCurrency(
+                        paymentDifference,
+                      )}`
+                    : `Excedente de ${formatCurrency(
+                        Math.abs(
+                          paymentDifference,
+                        ),
+                      )}`}
+              </strong>
+            </article>
+          </div>
+        </section>
+
+        {sale.tradeInDevice && (
+          <section className="sale-details__section">
+            <div className="sale-details__section-heading">
+              <h2>
+                Dispositivo recebido na
+                troca
+              </h2>
+
+              <p>
+                Aparelho recebido como parte
+                do pagamento desta venda.
+              </p>
+            </div>
+
+            <div className="sale-details__information-grid">
+              <article className="sale-details__information">
+                <Repeat2 size={20} />
+
+                <div>
+                  <span>Dispositivo</span>
+
+                  <strong>
+                    {
+                      sale.tradeInDevice
+                        .brand
+                    }{' '}
+                    {
+                      sale.tradeInDevice
+                        .model
+                    }
+                  </strong>
+                </div>
+              </article>
+
+              <article className="sale-details__information">
+                <Smartphone size={20} />
+
+                <div>
+                  <span>
+                    Armazenamento
+                  </span>
+
+                  <strong>
+                    {
+                      sale.tradeInDevice
+                        .storage
+                    }
+                  </strong>
+                </div>
+              </article>
+
+              <article className="sale-details__information">
+                <Hash size={20} />
+
+                <div>
+                  <span>IMEI</span>
+
+                  <strong>
+                    {sale.tradeInDevice
+                      .imei ||
+                      'Pendente'}
+                  </strong>
+                </div>
+              </article>
+
+              <article className="sale-details__information">
+                <CreditCard size={20} />
+
+                <div>
+                  <span>
+                    Valor considerado
+                  </span>
+
+                  <strong>
+                    {formatCurrency(
+                      sale.tradeInDevice
+                        .purchasePrice,
+                    )}
+                  </strong>
+                </div>
+              </article>
+
+              <article className="sale-details__information">
+                <Smartphone size={20} />
+
+                <div>
+                  <span>Condição</span>
+
+                  <strong>
+                    {getConditionLabel(
+                      sale.tradeInDevice
+                        .condition,
+                    )}
+                  </strong>
+                </div>
+              </article>
+
+              <article className="sale-details__information">
+                <CalendarDays size={20} />
+
+                <div>
+                  <span>
+                    Data de entrada
+                  </span>
+
+                  <strong>
+                    {formatDate(
+                      sale.tradeInDevice
+                        .entryDate,
+                    )}
+                  </strong>
+                </div>
+              </article>
+            </div>
+
+            <Link
+              to={`/dispositivos/${sale.tradeInDevice.id}`}
+              className="sale-details__device-link"
+            >
+              Visualizar dispositivo recebido
+            </Link>
+          </section>
+        )}
+
+        <section className="sale-details__section">
+          <div className="sale-details__section-heading">
             <h2>Observações</h2>
 
             <p>
-              Informações adicionais da negociação.
+              Informações adicionais da
+              negociação.
             </p>
           </div>
 
