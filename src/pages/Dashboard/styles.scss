@@ -588,4 +588,364 @@
     text-decoration: underline;
   }
 }
+
+}
+.dashboard {
+  &__period {
+    margin-bottom: 20px;
+    padding: 20px;
+    border: 1px solid #e5e7eb;
+    border-radius: 14px;
+
+    background-color: #ffffff;
+    box-shadow: 0 4px 14px
+      rgb(15 23 42 / 4%);
+  }
+
+  &__period-heading {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 20px;
+
+    margin-bottom: 18px;
+
+    h2 {
+      color: #111827;
+      font-size: 18px;
+    }
+
+    p {
+      margin-top: 5px;
+
+      color: #6b7280;
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    > strong {
+      flex-shrink: 0;
+
+      padding: 7px 11px;
+      border-radius: 999px;
+
+      color: #1d4ed8;
+      background-color: #dbeafe;
+
+      font-size: 12px;
+      font-weight: 600;
+    }
+  }
+
+  &__period-controls {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 14px;
+  }
+
+  &__period-presets {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  &__period-button {
+    min-height: 40px;
+    padding: 0 14px;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+
+    color: #374151;
+    background-color: #ffffff;
+
+    font: inherit;
+    font-size: 13px;
+    font-weight: 600;
+
+    cursor: pointer;
+
+    transition:
+      border-color 0.2s,
+      color 0.2s,
+      background-color 0.2s;
+
+    &:hover {
+      border-color: #93c5fd;
+
+      color: #1d4ed8;
+      background-color: #eff6ff;
+    }
+
+    &--active {
+      border-color: #2563eb;
+
+      color: #ffffff;
+      background-color: #2563eb;
+
+      &:hover {
+        border-color: #1d4ed8;
+
+        color: #ffffff;
+        background-color: #1d4ed8;
+      }
+    }
+  }
+
+  &__custom-period {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  &__date-field {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+
+    min-height: 42px;
+    padding: 0 10px;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+
+    background-color: #ffffff;
+
+    transition:
+      border-color 0.2s,
+      box-shadow 0.2s;
+
+    &:focus-within {
+      border-color: #2563eb;
+      box-shadow: 0 0 0 3px
+        rgb(37 99 235 / 12%);
+    }
+
+    svg {
+      flex-shrink: 0;
+      color: #6b7280;
+    }
+
+    label {
+      flex-shrink: 0;
+
+      color: #6b7280;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    input {
+      width: 135px;
+      height: 38px;
+      padding: 0;
+      border: 0;
+      outline: none;
+
+      color: #374151;
+      background-color: transparent;
+
+      font: inherit;
+      font-size: 13px;
+    }
+  }
+
+  &__clear-period {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+
+    min-height: 42px;
+    padding: 0 13px;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+
+    color: #374151;
+    background-color: #ffffff;
+
+    font: inherit;
+    font-size: 13px;
+    font-weight: 600;
+
+    cursor: pointer;
+
+    transition:
+      border-color 0.2s,
+      color 0.2s,
+      background-color 0.2s;
+
+    &:hover:not(:disabled) {
+      border-color: #9ca3af;
+
+      color: #111827;
+      background-color: #f9fafb;
+    }
+
+    &:disabled {
+      cursor: not-allowed;
+      opacity: 0.5;
+    }
+  }
+
+  &__period-error {
+    margin-top: 14px;
+    padding: 12px 14px;
+    border: 1px solid #fecaca;
+    border-radius: 9px;
+
+    color: #b91c1c;
+    background-color: #fef2f2;
+
+    font-size: 13px;
+    font-weight: 500;
+  }
+
+  /*
+   * Agora são quatro indicadores financeiros:
+   * faturamento, lucro, ticket e vendidos.
+   */
+  &__financial {
+    grid-template-columns:
+      repeat(4, minmax(0, 1fr));
+  }
+
+  &__financial-card {
+    min-width: 0;
+
+    strong {
+      overflow-wrap: anywhere;
+      font-size: 22px;
+    }
+  }
+
+  &__status {
+    &--pendente_informacoes {
+      color: #9a3412;
+      background-color: #ffedd5;
+    }
+  }
+
+  /*
+   * Estas classes estavam limitadas ao
+   * media query de 560px no arquivo anterior.
+   */
+  &__load-error {
+    margin-bottom: 20px;
+    padding: 14px 16px;
+    border: 1px solid #fecaca;
+    border-radius: 10px;
+
+    color: #b91c1c;
+    background-color: #fef2f2;
+
+    font-size: 14px;
+    font-weight: 500;
+  }
+
+  &__loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+
+    min-height: 320px;
+    border: 1px solid #e5e7eb;
+    border-radius: 14px;
+
+    color: #6b7280;
+    background-color: #ffffff;
+
+    font-size: 15px;
+    font-weight: 500;
+  }
+
+  &__sale-details {
+    color: #2563eb;
+    font-size: 13px;
+    font-weight: 600;
+    white-space: nowrap;
+
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+
+  &__sale-data {
+    grid-template-columns:
+      repeat(4, minmax(90px, auto));
+
+    div {
+      min-width: 0;
+    }
+
+    strong {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+  }
+}
+
+@media (max-width: 1250px) {
+  .dashboard {
+    &__financial {
+      grid-template-columns:
+        repeat(2, minmax(0, 1fr));
+    }
+
+    &__period-controls {
+      align-items: flex-start;
+      flex-direction: column;
+    }
+  }
+}
+
+@media (max-width: 768px) {
+  .dashboard {
+    &__period-heading {
+      flex-direction: column;
+
+      > strong {
+        align-self: flex-start;
+      }
+    }
+
+    &__period-presets,
+    &__custom-period {
+      width: 100%;
+    }
+
+    &__date-field {
+      flex: 1 1 210px;
+
+      input {
+        flex: 1;
+        width: auto;
+      }
+    }
+
+    &__clear-period {
+      flex: 1 1 130px;
+    }
+  }
+}
+
+@media (max-width: 620px) {
+  .dashboard {
+    &__financial {
+      grid-template-columns: 1fr;
+    }
+
+    &__period-button {
+      flex: 1 1 calc(50% - 8px);
+    }
+
+    &__date-field,
+    &__clear-period {
+      flex-basis: 100%;
+      width: 100%;
+    }
+  }
 }
