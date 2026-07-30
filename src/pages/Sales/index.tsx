@@ -19,11 +19,13 @@ import {
   listSales,
   type SaleSummary,
 } from '../../services/saleApi';
+import { listSellers } from '../../services/userApi';
 import type {
   PaymentMethod,
   Sale,
   SalePayment,
 } from '../../types/sale';
+import type { Seller } from '../../types/user';
 import { formatCurrency } from '../../utils/currency';
 
 import './styles.scss';
@@ -170,6 +172,24 @@ export function Sales() {
   const [sales, setSales] =
     useState<Sale[]>([]);
 
+  const [sellers, setSellers] =
+    useState<Seller[]>([]);
+
+  const [
+    sellerFilter,
+    setSellerFilter,
+  ] = useState('TODOS');
+
+  const [
+    isLoadingSellers,
+    setIsLoadingSellers,
+  ] = useState(true);
+
+  const [
+    sellersLoadError,
+    setSellersLoadError,
+  ] = useState('');
+
   const [summary, setSummary] =
     useState<SaleSummary>(
       initialSummary,
@@ -205,6 +225,7 @@ export function Sales() {
   const hasActiveFilters =
     search.trim() !== '' ||
     paymentFilter !== 'TODOS' ||
+    sellerFilter !== 'TODOS' ||
     startDate !== '' ||
     endDate !== '';
 
@@ -217,7 +238,12 @@ export function Sales() {
 
       try {
         const response =
-          await listSales();
+          await listSales({
+            sellerId:
+              sellerFilter === 'TODOS'
+                ? undefined
+                : sellerFilter,
+          });
 
         if (!isMounted) {
           return;
@@ -256,6 +282,52 @@ export function Sales() {
     return () => {
       isMounted = false;
     };
+  }, [sellerFilter]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadSellers() {
+      setIsLoadingSellers(true);
+      setSellersLoadError('');
+
+      try {
+        const response =
+          await listSellers();
+
+        if (!isMounted) {
+          return;
+        }
+
+        setSellers(response);
+      } catch (error) {
+        if (!isMounted) {
+          return;
+        }
+
+        setSellers([]);
+
+        if (error instanceof ApiError) {
+          setSellersLoadError(
+            error.message,
+          );
+        } else {
+          setSellersLoadError(
+            'Não foi possível carregar os vendedores.',
+          );
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoadingSellers(false);
+        }
+      }
+    }
+
+    void loadSellers();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   const filteredSales =
@@ -284,6 +356,7 @@ export function Sales() {
           const searchableContent =
             [
               sale.customerName,
+              sale.sellerName,
               sale.customerPhone,
               sale.customerSocialNetwork,
               sale.customerCity,
@@ -385,6 +458,7 @@ export function Sales() {
   function handleClearFilters() {
     setSearch('');
     setPaymentFilter('TODOS');
+    setSellerFilter('TODOS');
     setStartDate('');
     setEndDate('');
   }
@@ -477,7 +551,7 @@ export function Sales() {
                   event.target.value,
                 )
               }
-              placeholder="Pesquisar cliente, aparelho, IMEI ou pagamento"
+              placeholder="Pesquisar cliente, vendedor, aparelho, IMEI ou pagamento"
               aria-label="Pesquisar vendas"
               disabled={isLoading}
             />
@@ -525,6 +599,39 @@ export function Sales() {
             <option value="OUTRO">
               Outro
             </option>
+          </select>
+
+          <select
+            value={sellerFilter}
+            onChange={(event) =>
+              setSellerFilter(
+                event.target.value,
+              )
+            }
+            aria-label="Filtrar por vendedor"
+            disabled={
+              isLoading ||
+              isLoadingSellers
+            }
+          >
+            <option value="TODOS">
+              {isLoadingSellers
+                ? 'Carregando vendedores...'
+                : 'Todos os vendedores'}
+            </option>
+
+            {sellers.map((seller) => (
+              <option
+                key={seller.id}
+                value={seller.id}
+              >
+                {seller.name}
+                {' · '}
+                {seller.role === 'MASTER'
+                  ? 'Master'
+                  : 'Funcionário'}
+              </option>
+            ))}
           </select>
 
           <div className="sales__date-filter">
@@ -596,6 +703,15 @@ export function Sales() {
           </div>
         )}
 
+        {sellersLoadError && (
+          <div
+            className="sales__filter-error"
+            role="alert"
+          >
+            {sellersLoadError}
+          </div>
+        )}
+
         {loadError && (
           <div
             className="sales__load-error"
@@ -623,6 +739,7 @@ export function Sales() {
                 <thead>
                   <tr>
                     <th>Cliente</th>
+                    <th>Vendedor</th>
                     <th>Dispositivo</th>
                     <th>Data</th>
                     <th>Pagamentos</th>
@@ -663,6 +780,21 @@ export function Sales() {
                                     'Telefone não informado'}
                                 </span>
                               </div>
+                            </div>
+                          </td>
+
+                          <td>
+                            <div className="sales__seller">
+                              <strong>
+                                {sale.sellerName ||
+                                  'Não informado'}
+                              </strong>
+
+                              <span>
+                                {sale.sellerId
+                                  ? 'Responsável pela venda'
+                                  : 'Venda sem vendedor vinculado'}
+                              </span>
                             </div>
                           </td>
 
@@ -810,6 +942,15 @@ export function Sales() {
                       </div>
 
                       <div className="sales__card-info">
+                        <div>
+                          <span>Vendedor</span>
+
+                          <strong>
+                            {sale.sellerName ||
+                              'Não informado'}
+                          </strong>
+                        </div>
+
                         <div>
                           <span>
                             Data da venda

@@ -304,8 +304,9 @@
   }
 
   &__table {
-    width: 100%;
-    border-collapse: collapse;
+  width: 100%;
+  min-width: 1180px;
+  border-collapse: collapse;
 
     th,
     td {
@@ -370,24 +371,25 @@
     border-radius: 10px;
   }
 
-  &__device {
-    strong,
-    span {
-      display: block;
-    }
-
-    strong {
-      color: #111827;
-      font-size: 14px;
-    }
-
-    span {
-      margin-top: 3px;
-
-      color: #6b7280;
-      font-size: 12px;
-    }
+  &__device,
+&__seller {
+  strong,
+  span {
+    display: block;
   }
+
+  strong {
+    color: #111827;
+    font-size: 14px;
+  }
+
+  span {
+    margin-top: 3px;
+
+    color: #6b7280;
+    font-size: 12px;
+  }
+}
 
   &__payment {
     display: inline-flex;

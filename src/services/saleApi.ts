@@ -16,6 +16,10 @@ export interface SaleListResponse {
   meta: SaleSummary;
 }
 
+export interface SaleListFilters {
+  sellerId?: string;
+}
+
 interface CreateSaleResponse {
   message: string;
   data: Sale;
@@ -40,9 +44,28 @@ export async function createSale(
   return response.data;
 }
 
-export async function listSales(): Promise<SaleListResponse> {
+export async function listSales(
+  filters: SaleListFilters = {},
+): Promise<SaleListResponse> {
+  const searchParams =
+    new URLSearchParams();
+
+  if (filters.sellerId) {
+    searchParams.set(
+      'sellerId',
+      filters.sellerId,
+    );
+  }
+
+  const queryString =
+    searchParams.toString();
+
+  const endpoint = queryString
+    ? `/sales?${queryString}`
+    : '/sales';
+
   return apiRequest<SaleListResponse>(
-    '/sales',
+    endpoint,
   );
 }
 
