@@ -1,4 +1,5 @@
 import type {
+  CommissionPaymentStatus,
   CommissionsReportFilters,
   CommissionsReportResponse,
   DevicesReportFilters,
@@ -8,6 +9,60 @@ import type {
 } from '../types/report';
 
 import { apiRequest } from './api';
+
+interface UpdateCommissionPaymentStatusResponse {
+  message: string;
+
+  data: {
+    id: string;
+
+    commissionPaymentStatus:
+      CommissionPaymentStatus;
+
+    commissionPaidAt:
+      string | null;
+  };
+}
+
+/*
+ * O React StrictMode executa os effects duas
+ * vezes no ambiente de desenvolvimento.
+ *
+ * Este Map reaproveita uma requisição GET que
+ * já esteja em andamento para o mesmo endpoint,
+ * evitando chamadas HTTP duplicadas.
+ */
+const inFlightReportRequests =
+  new Map<string, Promise<unknown>>();
+
+function requestReportOnce<T>(
+  endpoint: string,
+): Promise<T> {
+  const currentRequest =
+    inFlightReportRequests.get(
+      endpoint,
+    ) as Promise<T> | undefined;
+
+  if (currentRequest) {
+    return currentRequest;
+  }
+
+  const request =
+    apiRequest<T>(endpoint).finally(
+      () => {
+        inFlightReportRequests.delete(
+          endpoint,
+        );
+      },
+    );
+
+  inFlightReportRequests.set(
+    endpoint,
+    request,
+  );
+
+  return request;
+}
 
 function createQueryParams(
   filters: Record<
@@ -59,8 +114,11 @@ export async function getSalesReport(
         filters.paymentMethod,
     });
 
-  return apiRequest<SalesReportResponse>(
-    `/reports/sales${queryString}`,
+  const endpoint =
+    `/reports/sales${queryString}`;
+
+  return requestReportOnce<SalesReportResponse>(
+    endpoint,
   );
 }
 
@@ -78,8 +136,11 @@ export async function getDevicesReport(
       status: filters.status,
     });
 
-  return apiRequest<DevicesReportResponse>(
-    `/reports/devices${queryString}`,
+  const endpoint =
+    `/reports/devices${queryString}`;
+
+  return requestReportOnce<DevicesReportResponse>(
+    endpoint,
   );
 }
 
@@ -94,7 +155,29 @@ export async function getCommissionsReport(
       sellerId: filters.sellerId,
     });
 
-  return apiRequest<CommissionsReportResponse>(
-    `/reports/commissions${queryString}`,
+  const endpoint =
+    `/reports/commissions${queryString}`;
+
+  return requestReportOnce<CommissionsReportResponse>(
+    endpoint,
   );
+}
+
+export async function updateCommissionPaymentStatus(
+  saleId: string,
+  status: CommissionPaymentStatus,
+) {
+  const response =
+    await apiRequest<UpdateCommissionPaymentStatusResponse>(
+      `/sales/${saleId}/commission-status`,
+      {
+        method: 'PATCH',
+
+        body: JSON.stringify({
+          status,
+        }),
+      },
+    );
+
+  return response.data;
 }

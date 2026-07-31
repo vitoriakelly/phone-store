@@ -11,15 +11,32 @@ import type {
   UpdateEmployeeStatusInput,
 } from '../types/user';
 
+/*
+ * Evita duas chamadas simultâneas para a
+ * listagem de vendedores no React StrictMode.
+ */
+let sellersRequest:
+  Promise<Seller[]> | null = null;
+
 export async function listSellers(): Promise<
   Seller[]
 > {
-  const response =
-    await apiRequest<SellersResponse>(
-      '/users/employees/sellers',
-    );
+  if (sellersRequest) {
+    return sellersRequest;
+  }
 
-  return response.data.sellers;
+  sellersRequest = apiRequest<SellersResponse>(
+    '/users/employees/sellers',
+  )
+    .then(
+      (response) =>
+        response.data.sellers,
+    )
+    .finally(() => {
+      sellersRequest = null;
+    });
+
+  return sellersRequest;
 }
 
 export async function listEmployees(): Promise<

@@ -4,7 +4,6 @@ import {
   LockKeyhole,
   LogIn,
   Mail,
-  Smartphone,
 } from 'lucide-react';
 import {
   type FormEvent,

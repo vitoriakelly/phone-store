@@ -24,10 +24,12 @@ import {
   getCommissionsReport,
   getDevicesReport,
   getSalesReport,
+  updateCommissionPaymentStatus,
 } from '../../services/reportApi';
 import { listSellers } from '../../services/userApi';
 import type { Device } from '../../types/device';
 import type {
+  CommissionPaymentStatus,
   CommissionReportSale,
   CommissionsReportFilters,
   CommissionsReportMeta,
@@ -338,6 +340,14 @@ function getCommissionTypeLabel(
   return 'Sem comissão';
 }
 
+function getCommissionPaymentStatusLabel(
+  status: CommissionPaymentStatus,
+) {
+  return status === 'PAID'
+    ? 'Pago'
+    : 'Pendente';
+}
+
 function getCommissionRule(
   sale: {
     commissionType:
@@ -466,6 +476,11 @@ export function Reports() {
 
   const [loadError, setLoadError] =
     useState('');
+
+  const [
+    updatingCommissionSaleId,
+    setUpdatingCommissionSaleId,
+  ] = useState<string | null>(null);
 
   const [
     hasLoadedDevices,
@@ -754,6 +769,55 @@ export function Reports() {
     );
   }
 
+  async function handleCommissionStatusChange(
+    saleId: string,
+    status: CommissionPaymentStatus,
+  ) {
+    setUpdatingCommissionSaleId(
+      saleId,
+    );
+
+    setLoadError('');
+
+    try {
+      const updatedSale =
+        await updateCommissionPaymentStatus(
+          saleId,
+          status,
+        );
+
+      setCommissionSales(
+        (currentSales) =>
+          currentSales.map(
+            (sale) =>
+              sale.id === saleId
+                ? {
+                    ...sale,
+
+                    commissionPaymentStatus:
+                      updatedSale
+                        .commissionPaymentStatus,
+
+                    commissionPaidAt:
+                      updatedSale
+                        .commissionPaidAt,
+                  }
+                : sale,
+          ),
+      );
+    } catch (error) {
+      setLoadError(
+        error instanceof ApiError
+          ? error.message
+          : 'Não foi possível atualizar o status da comissão.',
+      );
+    } finally {
+      setUpdatingCommissionSaleId(
+        null,
+      );
+    }
+  }
+
   function handlePrintReport() {
     const generatedAt =
       new Intl.DateTimeFormat(
@@ -964,6 +1028,14 @@ export function Reports() {
                 <td>${escapeHtml(formatCurrency(sale.salePrice))}</td>
                 <td>${escapeHtml(getCommissionRule(sale))}</td>
                 <td>${escapeHtml(formatCurrency(sale.commissionAmount))}</td>
+                <td>${escapeHtml(
+                  sale.commissionAmount > 0
+                    ? getCommissionPaymentStatusLabel(
+                        sale.commissionPaymentStatus ??
+                          'PENDING',
+                      )
+                    : 'Sem comissão',
+                )}</td>
                 <td>${escapeHtml(formatCurrency(sale.profitAfterCommission))}</td>
               </tr>
             `,
@@ -998,6 +1070,7 @@ export function Reports() {
               <th>Valor líquido</th>
               <th>Regra</th>
               <th>Comissão</th>
+              <th>Status</th>
               <th>Lucro final</th>
             </tr>
           </thead>
@@ -2461,6 +2534,7 @@ export function Reports() {
                       <th>Tipo</th>
                       <th>Regra</th>
                       <th>Comissão</th>
+                      <th>Status</th>
                       <th>Lucro final</th>
                       <th />
                     </tr>
@@ -2527,6 +2601,64 @@ export function Reports() {
                                 sale.commissionAmount,
                               )}
                             </strong>
+                          </td>
+
+                          <td>
+                            {sale.commissionAmount >
+                            0 ? (
+                              <div className="reports__commission-status">
+                                <select
+                                  value={
+                                    sale.commissionPaymentStatus ??
+                                    'PENDING'
+                                  }
+                                  disabled={
+                                    updatingCommissionSaleId ===
+                                    sale.id
+                                  }
+                                  onChange={(event) =>
+                                    void handleCommissionStatusChange(
+                                      sale.id,
+
+                                      event
+                                        .target
+                                        .value as CommissionPaymentStatus,
+                                    )
+                                  }
+                                  aria-label={`Status da comissão de ${sale.sellerName}`}
+                                >
+                                  <option value="PENDING">
+                                    Pendente
+                                  </option>
+
+                                  <option value="PAID">
+                                    Pago
+                                  </option>
+                                </select>
+
+                                {updatingCommissionSaleId ===
+                                  sale.id && (
+                                  <small>
+                                    Atualizando...
+                                  </small>
+                                )}
+
+                                {sale.commissionPaymentStatus ===
+                                  'PAID' &&
+                                  sale.commissionPaidAt && (
+                                    <small>
+                                      Pago em{' '}
+                                      {formatDate(
+                                        sale.commissionPaidAt,
+                                      )}
+                                    </small>
+                                  )}
+                              </div>
+                            ) : (
+                              <span>
+                                Sem comissão
+                              </span>
+                            )}
                           </td>
 
                           <td>

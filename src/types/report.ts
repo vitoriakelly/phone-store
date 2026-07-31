@@ -8,6 +8,10 @@ import type {
   Sale,
 } from './sale';
 
+export type CommissionPaymentStatus =
+  | 'PENDING'
+  | 'PAID';
+
 export interface PaginationMeta {
   page: number;
   pageSize: number;
@@ -109,6 +113,12 @@ export interface CommissionReportSale {
     CommissionType | null;
   commissionValue: number | null;
   commissionAmount: number;
+
+  commissionPaymentStatus:
+    CommissionPaymentStatus;
+
+  commissionPaidAt:
+    string | null;
 
   profitBeforeCommission: number;
   profitAfterCommission: number;
