@@ -4,20 +4,32 @@ import type {
 } from './device';
 import type {
   CommissionType,
+  PaymentMethod,
   Sale,
 } from './sale';
 
+export interface PaginationMeta {
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+  hasPreviousPage: boolean;
+  hasNextPage: boolean;
+}
+
 export interface SalesReportFilters {
+  page?: number;
   startDate?: string;
   endDate?: string;
   imei?: string;
   customerName?: string;
   deviceName?: string;
   sellerId?: string;
+  paymentMethod?: PaymentMethod;
 }
 
-export interface SalesReportMeta {
-  total: number;
+export interface SalesReportMeta
+  extends PaginationMeta {
   totalGrossRevenue: number;
   totalDiscount: number;
   totalRevenue: number;
@@ -35,6 +47,7 @@ export interface SalesReportResponse {
 }
 
 export interface DevicesReportFilters {
+  page?: number;
   startDate?: string;
   endDate?: string;
   imei?: string;
@@ -43,8 +56,13 @@ export interface DevicesReportFilters {
   status?: Device['status'];
 }
 
-export interface DevicesReportMeta {
-  total: number;
+export interface DevicesReportMeta
+  extends PaginationMeta {
+  /*
+   * Indicadores gerais do estoque,
+   * independentes dos filtros.
+   */
+  totalDevices: number;
   pending: number;
   available: number;
   reserved: number;
@@ -61,6 +79,7 @@ export interface DevicesReportResponse {
 }
 
 export interface CommissionsReportFilters {
+  page?: number;
   startDate?: string;
   endDate?: string;
   sellerId?: string;
@@ -75,7 +94,8 @@ export interface CommissionReportSale {
   deviceBrand: string;
   deviceModel: string;
   deviceImei: string;
-  deviceCondition: DeviceCondition | null;
+  deviceCondition:
+    DeviceCondition | null;
 
   customerName: string;
   soldAt: string;
@@ -85,7 +105,8 @@ export interface CommissionReportSale {
   salePrice: number;
   purchasePrice: number;
 
-  commissionType: CommissionType | null;
+  commissionType:
+    CommissionType | null;
   commissionValue: number | null;
   commissionAmount: number;
 
@@ -113,7 +134,8 @@ export interface CommissionSellerSummary {
   averageCommission: number;
 }
 
-export interface CommissionsReportMeta {
+export interface CommissionsReportMeta
+  extends PaginationMeta {
   totalSales: number;
   commissionedSales: number;
   totalSellers: number;

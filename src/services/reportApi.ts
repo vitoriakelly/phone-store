@@ -12,7 +12,7 @@ import { apiRequest } from './api';
 function createQueryParams(
   filters: Record<
     string,
-    string | undefined
+    string | number | undefined
   >,
 ) {
   const queryParams =
@@ -20,15 +20,17 @@ function createQueryParams(
 
   Object.entries(filters).forEach(
     ([key, value]) => {
-      const normalizedValue =
-        value?.trim();
-
-      if (normalizedValue) {
-        queryParams.set(
-          key,
-          normalizedValue,
-        );
+      if (
+        value === undefined ||
+        value === ''
+      ) {
+        return;
       }
+
+      queryParams.set(
+        key,
+        String(value).trim(),
+      );
     },
   );
 
@@ -45,6 +47,7 @@ export async function getSalesReport(
 ): Promise<SalesReportResponse> {
   const queryString =
     createQueryParams({
+      page: filters.page ?? 1,
       startDate: filters.startDate,
       endDate: filters.endDate,
       imei: filters.imei,
@@ -52,6 +55,8 @@ export async function getSalesReport(
         filters.customerName,
       deviceName: filters.deviceName,
       sellerId: filters.sellerId,
+      paymentMethod:
+        filters.paymentMethod,
     });
 
   return apiRequest<SalesReportResponse>(
@@ -64,6 +69,7 @@ export async function getDevicesReport(
 ): Promise<DevicesReportResponse> {
   const queryString =
     createQueryParams({
+      page: filters.page ?? 1,
       startDate: filters.startDate,
       endDate: filters.endDate,
       imei: filters.imei,
@@ -82,6 +88,7 @@ export async function getCommissionsReport(
 ): Promise<CommissionsReportResponse> {
   const queryString =
     createQueryParams({
+      page: filters.page ?? 1,
       startDate: filters.startDate,
       endDate: filters.endDate,
       sellerId: filters.sellerId,

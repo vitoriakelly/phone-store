@@ -15,7 +15,6 @@ import {
   type FormEvent,
   type ReactNode,
   useEffect,
-  useMemo,
   useState,
 } from 'react';
 import { Link } from 'react-router-dom';
@@ -35,6 +34,7 @@ import type {
   CommissionSellerSummary,
   DevicesReportFilters,
   DevicesReportMeta,
+  PaginationMeta,
   SalesReportFilters,
   SalesReportMeta,
 } from '../../types/report';
@@ -54,9 +54,6 @@ type ReportTab =
   | 'devices'
   | 'commissions';
 
-type PaymentFilter =
-  | 'TODOS'
-  | PaymentMethod;
 
 function getCurrentDate() {
   const currentDate = new Date();
@@ -77,23 +74,28 @@ const currentDate =
   getCurrentDate();
 
 const initialSalesFilters: SalesReportFilters = {
+  page: 1,
   startDate: currentDate,
   endDate: currentDate,
   imei: '',
   customerName: '',
   deviceName: '',
   sellerId: '',
+  paymentMethod: undefined,
 };
 
 /*
- * O relatório de dispositivos sempre
- * inicia contemplando todo o estoque.
- * As datas só são aplicadas quando o
- * usuário preencher os filtros.
+ * A tabela e os indicadores do período
+ * iniciam usando a data atual.
+ *
+ * Os cards Dispositivos, Pendentes e
+ * Disponíveis continuam mostrando os
+ * totais gerais enviados pelo backend.
  */
 const initialDevicesFilters: DevicesReportFilters = {
-  startDate: '',
-  endDate: '',
+  page: 1,
+  startDate: currentDate,
+  endDate: currentDate,
   imei: '',
   supplier: '',
   deviceName: '',
@@ -102,13 +104,19 @@ const initialDevicesFilters: DevicesReportFilters = {
 
 const initialCommissionsFilters:
   CommissionsReportFilters = {
+    page: 1,
     startDate: currentDate,
     endDate: currentDate,
     sellerId: '',
   };
 
 const initialSalesMeta: SalesReportMeta = {
+  page: 1,
+  pageSize: 10,
   total: 0,
+  totalPages: 0,
+  hasPreviousPage: false,
+  hasNextPage: false,
   totalGrossRevenue: 0,
   totalDiscount: 0,
   totalRevenue: 0,
@@ -120,7 +128,13 @@ const initialSalesMeta: SalesReportMeta = {
 };
 
 const initialDevicesMeta: DevicesReportMeta = {
+  page: 1,
+  pageSize: 10,
   total: 0,
+  totalDevices: 0,
+  totalPages: 0,
+  hasPreviousPage: false,
+  hasNextPage: false,
   pending: 0,
   available: 0,
   reserved: 0,
@@ -132,6 +146,12 @@ const initialDevicesMeta: DevicesReportMeta = {
 
 const initialCommissionsMeta:
   CommissionsReportMeta = {
+    page: 1,
+    pageSize: 10,
+    total: 0,
+    totalPages: 0,
+    hasPreviousPage: false,
+    hasNextPage: false,
     totalSales: 0,
     commissionedSales: 0,
     totalSellers: 0,
@@ -271,18 +291,6 @@ function getPaymentSummary(
   }`;
 }
 
-function saleHasPaymentMethod(
-  sale: Sale,
-  paymentMethod: PaymentMethod,
-) {
-  return getSalePayments(
-    sale,
-  ).some(
-    (payment) =>
-      payment.method ===
-      paymentMethod,
-  );
-}
 
 function getDeviceStatusLabel(
   status: Device['status'],
@@ -407,12 +415,6 @@ export function Reports() {
       initialCommissionsFilters,
     );
 
-  const [
-    salesPaymentFilter,
-    setSalesPaymentFilter,
-  ] = useState<PaymentFilter>(
-    'TODOS',
-  );
 
   const [sales, setSales] =
     useState<Sale[]>([]);
@@ -639,9 +641,13 @@ export function Reports() {
   ) {
     event.preventDefault();
 
-    void loadSalesReport(
-      salesFilters,
-    );
+    const nextFilters = {
+      ...salesFilters,
+      page: 1,
+    };
+
+    setSalesFilters(nextFilters);
+    void loadSalesReport(nextFilters);
   }
 
   function handleDevicesSubmit(
@@ -649,9 +655,13 @@ export function Reports() {
   ) {
     event.preventDefault();
 
-    void loadDevicesReport(
-      devicesFilters,
-    );
+    const nextFilters = {
+      ...devicesFilters,
+      page: 1,
+    };
+
+    setDevicesFilters(nextFilters);
+    void loadDevicesReport(nextFilters);
   }
 
   function handleCommissionsSubmit(
@@ -659,18 +669,18 @@ export function Reports() {
   ) {
     event.preventDefault();
 
-    void loadCommissionsReport(
-      commissionsFilters,
-    );
+    const nextFilters = {
+      ...commissionsFilters,
+      page: 1,
+    };
+
+    setCommissionsFilters(nextFilters);
+    void loadCommissionsReport(nextFilters);
   }
 
   function handleClearSalesFilters() {
     setSalesFilters(
       initialSalesFilters,
-    );
-
-    setSalesPaymentFilter(
-      'TODOS',
     );
 
     void loadSalesReport(
@@ -698,104 +708,51 @@ export function Reports() {
     );
   }
 
-  const filteredSales =
-    useMemo(() => {
-      if (
-        salesPaymentFilter ===
-        'TODOS'
-      ) {
-        return sales;
-      }
+  /*
+   * Os filtros e a paginação são aplicados
+   * pelo backend. A tela recebe somente os
+   * 10 registros da página atual.
+   */
+  const filteredSales = sales;
+  const displayedSalesMeta = salesMeta;
 
-      return sales.filter(
-        (sale) =>
-          saleHasPaymentMethod(
-            sale,
-            salesPaymentFilter,
-          ),
-      );
-    }, [
-      sales,
-      salesPaymentFilter,
-    ]);
+  function handleSalesPageChange(
+    page: number,
+  ) {
+    const nextFilters = {
+      ...salesFilters,
+      page,
+    };
 
-  const displayedSalesMeta =
-    useMemo<SalesReportMeta>(() => {
-      if (
-        salesPaymentFilter ===
-        'TODOS'
-      ) {
-        return salesMeta;
-      }
+    setSalesFilters(nextFilters);
+    void loadSalesReport(nextFilters);
+  }
 
-      const total =
-        filteredSales.length;
+  function handleDevicesPageChange(
+    page: number,
+  ) {
+    const nextFilters = {
+      ...devicesFilters,
+      page,
+    };
 
-      const totalGrossRevenue =
-        filteredSales.reduce(
-          (sum, sale) =>
-            sum +
-            sale.grossSalePrice,
-          0,
-        );
+    setDevicesFilters(nextFilters);
+    void loadDevicesReport(nextFilters);
+  }
 
-      const totalDiscount =
-        filteredSales.reduce(
-          (sum, sale) =>
-            sum +
-            sale.discountAmount,
-          0,
-        );
+  function handleCommissionsPageChange(
+    page: number,
+  ) {
+    const nextFilters = {
+      ...commissionsFilters,
+      page,
+    };
 
-      const totalRevenue =
-        filteredSales.reduce(
-          (sum, sale) =>
-            sum + sale.salePrice,
-          0,
-        );
-
-      const totalCost =
-        filteredSales.reduce(
-          (sum, sale) =>
-            sum +
-            sale.purchasePrice,
-          0,
-        );
-
-      const totalCommission =
-        filteredSales.reduce(
-          (sum, sale) =>
-            sum +
-            sale.commissionAmount,
-          0,
-        );
-
-      const totalProfit =
-        totalRevenue - totalCost;
-
-      return {
-        total,
-        totalGrossRevenue,
-        totalDiscount,
-        totalRevenue,
-        totalCost,
-        totalCommission,
-        totalProfit,
-
-        totalProfitAfterCommission:
-          totalProfit -
-          totalCommission,
-
-        averageTicket:
-          total > 0
-            ? totalRevenue / total
-            : 0,
-      };
-    }, [
-      filteredSales,
-      salesMeta,
-      salesPaymentFilter,
-    ]);
+    setCommissionsFilters(nextFilters);
+    void loadCommissionsReport(
+      nextFilters,
+    );
+  }
 
   function handlePrintReport() {
     const generatedAt =
@@ -905,7 +862,7 @@ export function Reports() {
 
       summaryHtml = `
         <section class="summary">
-          <article><span>Dispositivos</span><strong>${devicesMeta.total}</strong></article>
+          <article><span>Dispositivos</span><strong>${devicesMeta.totalDevices}</strong></article>
           <article><span>Pendentes</span><strong>${devicesMeta.pending}</strong></article>
           <article><span>Disponíveis</span><strong>${devicesMeta.available}</strong></article>
           <article><span>Reservados</span><strong>${devicesMeta.reserved}</strong></article>
@@ -1453,16 +1410,25 @@ export function Reports() {
 
                 <select
                   value={
-                    salesPaymentFilter
+                    salesFilters
+                      .paymentMethod ?? ''
                   }
                   onChange={(event) =>
-                    setSalesPaymentFilter(
-                      event.target
-                        .value as PaymentFilter,
+                    setSalesFilters(
+                      (current) => ({
+                        ...current,
+
+                        paymentMethod:
+                          event.target.value
+                            ? (event
+                                .target
+                                .value as PaymentMethod)
+                            : undefined,
+                      }),
                     )
                   }
                 >
-                  <option value="TODOS">
+                  <option value="">
                     Todas as formas
                   </option>
                   <option value="PIX">
@@ -1703,6 +1669,16 @@ export function Reports() {
             ) : (
               <ReportState text="Nenhuma venda encontrada." />
             )}
+
+            {!isLoading &&
+              salesMeta.total > 0 && (
+                <ReportPagination
+                  meta={salesMeta}
+                  onPageChange={
+                    handleSalesPageChange
+                  }
+                />
+              )}
           </section>
         </>
       )}
@@ -1717,9 +1693,11 @@ export function Reports() {
                 </h2>
 
                 <p>
-                  Pesquise por período,
-                  IMEI, fornecedor,
-                  dispositivo ou status.
+                  Dispositivos, pendentes
+                  e disponíveis são totais
+                  gerais. A tabela e os
+                  demais indicadores
+                  respeitam os filtros.
                 </p>
               </div>
 
@@ -1924,7 +1902,7 @@ export function Reports() {
               }
               label="Dispositivos"
               value={String(
-                devicesMeta.total,
+                devicesMeta.totalDevices,
               )}
             />
 
@@ -2090,6 +2068,16 @@ export function Reports() {
             ) : (
               <ReportState text="Nenhum dispositivo encontrado." />
             )}
+
+            {!isLoading &&
+              devicesMeta.total > 0 && (
+                <ReportPagination
+                  meta={devicesMeta}
+                  onPageChange={
+                    handleDevicesPageChange
+                  }
+                />
+              )}
           </section>
         </>
       )}
@@ -2563,6 +2551,18 @@ export function Reports() {
             ) : (
               <ReportState text="Nenhuma venda com comissão encontrada." />
             )}
+
+            {!isLoading &&
+              commissionsMeta.total > 0 && (
+                <ReportPagination
+                  meta={
+                    commissionsMeta
+                  }
+                  onPageChange={
+                    handleCommissionsPageChange
+                  }
+                />
+              )}
           </section>
         </>
       )}
@@ -2626,6 +2626,81 @@ function ReportResultsHeader({
         </button>
       </div>
     </section>
+  );
+}
+
+interface ReportPaginationProps {
+  meta: PaginationMeta;
+  onPageChange: (
+    page: number,
+  ) => void;
+}
+
+function ReportPagination({
+  meta,
+  onPageChange,
+}: ReportPaginationProps) {
+  const firstResult =
+    meta.total === 0
+      ? 0
+      : (meta.page - 1) *
+          meta.pageSize +
+        1;
+
+  const lastResult = Math.min(
+    meta.page * meta.pageSize,
+    meta.total,
+  );
+
+  return (
+    <nav
+      className="reports__pagination"
+      aria-label="Paginação do relatório"
+    >
+      <span>
+        Exibindo {firstResult}–
+        {lastResult} de {meta.total}{' '}
+        resultados
+      </span>
+
+      <div>
+        <button
+          type="button"
+          onClick={() =>
+            onPageChange(
+              meta.page - 1,
+            )
+          }
+          disabled={
+            !meta.hasPreviousPage
+          }
+        >
+          Anterior
+        </button>
+
+        <strong>
+          Página {meta.page} de{' '}
+          {Math.max(
+            meta.totalPages,
+            1,
+          )}
+        </strong>
+
+        <button
+          type="button"
+          onClick={() =>
+            onPageChange(
+              meta.page + 1,
+            )
+          }
+          disabled={
+            !meta.hasNextPage
+          }
+        >
+          Próxima
+        </button>
+      </div>
+    </nav>
   );
 }
 
