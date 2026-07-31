@@ -12,42 +12,57 @@ import type {
 } from '../types/user';
 
 /*
- * Evita duas chamadas simultâneas para a
- * listagem de vendedores no React StrictMode.
+ * Reaproveita requisições simultâneas no
+ * React StrictMode durante o desenvolvimento.
  */
 let sellersRequest:
   Promise<Seller[]> | null = null;
 
-export async function listSellers(): Promise<
+let employeesRequest:
+  Promise<Employee[]> | null = null;
+
+export function listSellers(): Promise<
   Seller[]
 > {
   if (sellersRequest) {
     return sellersRequest;
   }
 
-  sellersRequest = apiRequest<SellersResponse>(
-    '/users/employees/sellers',
-  )
-    .then(
-      (response) =>
-        response.data.sellers,
+  sellersRequest =
+    apiRequest<SellersResponse>(
+      '/users/employees/sellers',
     )
-    .finally(() => {
-      sellersRequest = null;
-    });
+      .then(
+        (response) =>
+          response.data.sellers,
+      )
+      .finally(() => {
+        sellersRequest = null;
+      });
 
   return sellersRequest;
 }
 
-export async function listEmployees(): Promise<
+export function listEmployees(): Promise<
   Employee[]
 > {
-  const response =
-    await apiRequest<EmployeesResponse>(
-      '/users/employees',
-    );
+  if (employeesRequest) {
+    return employeesRequest;
+  }
 
-  return response.data.employees;
+  employeesRequest =
+    apiRequest<EmployeesResponse>(
+      '/users/employees',
+    )
+      .then(
+        (response) =>
+          response.data.employees,
+      )
+      .finally(() => {
+        employeesRequest = null;
+      });
+
+  return employeesRequest;
 }
 
 export async function createEmployee(
