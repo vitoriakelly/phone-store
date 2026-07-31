@@ -125,7 +125,7 @@ export function Employees() {
         setPageError(error.message);
       } else {
         setPageError(
-          'Não foi possível carregar os funcionários.',
+          'Não foi possível carregar os Colaboradores.',
         );
       }
     } finally {
@@ -172,7 +172,7 @@ export function Employees() {
     if (!createForm.name.trim()) {
       setCreateErrors({
         name: [
-          'Informe o nome do funcionário.',
+          'Informe o nome do Colaborador.',
         ],
       });
 
@@ -182,7 +182,7 @@ export function Employees() {
     if (!createForm.email.trim()) {
       setCreateErrors({
         email: [
-          'Informe o e-mail do funcionário.',
+          'Informe o e-mail do Colaborador.',
         ],
       });
 
@@ -234,7 +234,7 @@ export function Employees() {
         );
       } else {
         setCreateFormError(
-          'Não foi possível cadastrar o funcionário.',
+          'Não foi possível cadastrar o Colaborador.',
         );
       }
     } finally {
@@ -249,8 +249,8 @@ export function Employees() {
 
     const confirmationMessage =
       newStatus
-        ? `Deseja ativar o funcionário ${employee.name}?`
-        : `Deseja desativar o funcionário ${employee.name}?`;
+        ? `Deseja ativar o Colaborador ${employee.name}?`
+        : `Deseja desativar o Colaborador ${employee.name}?`;
 
     const confirmed =
       window.confirm(
@@ -294,7 +294,7 @@ export function Employees() {
         setPageError(error.message);
       } else {
         setPageError(
-          'Não foi possível alterar o status do funcionário.',
+          'Não foi possível alterar o status do Colaborador.',
         );
       }
     } finally {
@@ -384,11 +384,11 @@ export function Employees() {
             Administração
           </span>
 
-          <h1>Funcionários</h1>
+          <h1>Colaboradores</h1>
 
           <p>
             Cadastre e gerencie os acessos dos
-            funcionários da loja.
+            Colaboradores da loja.
           </p>
         </div>
 
@@ -451,7 +451,7 @@ export function Employees() {
       <section className="employees-page__summary">
         <article>
           <div>
-            <span>Total de funcionários</span>
+            <span>Total de Colaboradores</span>
             <strong>{employees.length}</strong>
           </div>
 
@@ -460,7 +460,7 @@ export function Employees() {
 
         <article>
           <div>
-            <span>Funcionários ativos</span>
+            <span>Colaboradores ativos</span>
             <strong>{activeEmployees}</strong>
           </div>
 
@@ -469,7 +469,7 @@ export function Employees() {
 
         <article>
           <div>
-            <span>Funcionários inativos</span>
+            <span>Colaboradores inativos</span>
             <strong>
               {employees.length -
                 activeEmployees}
@@ -488,11 +488,11 @@ export function Employees() {
             </div>
 
             <div>
-              <h2>Novo funcionário</h2>
+              <h2>Novo Colaborador</h2>
 
               <p>
                 O novo usuário será cadastrado com
-                perfil FUNCIONARIO.
+                perfil Colaborador.
               </p>
             </div>
           </div>
@@ -513,7 +513,7 @@ export function Employees() {
               <input
                 type="text"
                 value={createForm.name}
-                placeholder="Nome do funcionário"
+                placeholder="Nome do Colaborador"
                 disabled={isCreating}
                 onChange={(event) =>
                   updateCreateField(
@@ -536,7 +536,7 @@ export function Employees() {
               <input
                 type="email"
                 value={createForm.email}
-                placeholder="funcionario@exemplo.com"
+                placeholder="colaborador@exemplo.com"
                 autoComplete="email"
                 disabled={isCreating}
                 onChange={(event) =>
@@ -586,7 +586,7 @@ export function Employees() {
 
               {isCreating
                 ? 'Cadastrando...'
-                : 'Cadastrar funcionário'}
+                : 'Cadastrar Colaborador'}
             </button>
           </form>
         </article>
@@ -598,7 +598,7 @@ export function Employees() {
             </div>
 
             <div>
-              <h2>Funcionários cadastrados</h2>
+              <h2>Colaboradores cadastrados</h2>
 
               <p>
                 Gerencie status e senhas de acesso.
@@ -608,18 +608,18 @@ export function Employees() {
 
           {isLoading ? (
             <div className="employees-page__state">
-              Carregando funcionários...
+              Carregando Colaboradores...
             </div>
           ) : employees.length === 0 ? (
             <div className="employees-page__state">
-              Nenhum funcionário cadastrado.
+              Nenhum Colaborador cadastrado.
             </div>
           ) : (
             <div className="employees-page__table-wrapper">
               <table className="employees-page__table">
                 <thead>
                   <tr>
-                    <th>Funcionário</th>
+                    <th>Colaborador</th>
                     <th>Status</th>
                     <th>Último acesso</th>
                     <th>Ações</th>

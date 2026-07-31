@@ -190,7 +190,7 @@ export function Sidebar({
             >
               <Users size={20} />
 
-              <span>Funcionários</span>
+              <span>Colaboradores</span>
             </NavLink>
           </>
         )}

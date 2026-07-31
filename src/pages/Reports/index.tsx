@@ -2320,7 +2320,7 @@ export function Reports() {
 
                 <p>
                   Totais consolidados de
-                  cada funcionário.
+                  cada Colaborador.
                 </p>
               </div>
 
