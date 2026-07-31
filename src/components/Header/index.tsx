@@ -1,12 +1,30 @@
-import { Menu, UserRound } from 'lucide-react';
+import {
+  Menu,
+  UserRound,
+} from 'lucide-react';
+
+
 
 import './styles.scss';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface HeaderProps {
   onOpenMenu: () => void;
 }
 
-export function Header({ onOpenMenu }: HeaderProps) {
+function getRoleLabel(
+  role: 'MASTER' | 'FUNCIONARIO',
+) {
+  return role === 'MASTER'
+    ? 'Administrador'
+    : 'Colaborador';
+}
+
+export function Header({
+  onOpenMenu,
+}: HeaderProps) {
+  const { user } = useAuth();
+
   return (
     <header className="header">
       <button
@@ -19,8 +37,14 @@ export function Header({ onOpenMenu }: HeaderProps) {
       </button>
 
       <div className="header__title">
-        <strong>Gestão de dispositivos</strong>
-        <span>Controle os aparelhos da sua loja</span>
+        <strong>
+          Gestão de dispositivos
+        </strong>
+
+        <span>
+          Controle os aparelhos da sua
+          loja
+        </span>
       </div>
 
       <div className="header__profile">
@@ -29,8 +53,16 @@ export function Header({ onOpenMenu }: HeaderProps) {
         </div>
 
         <div className="header__profile-info">
-          <strong>Vitória Kelly</strong>
-          <span>Administradora</span>
+          <strong>
+            {user?.name ??
+              'Usuário'}
+          </strong>
+
+          <span>
+            {user
+              ? getRoleLabel(user.role)
+              : 'Carregando...'}
+          </span>
         </div>
       </div>
     </header>
