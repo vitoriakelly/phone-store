@@ -16,14 +16,13 @@ import { Link } from 'react-router-dom';
 
 import { SummaryCard } from '../../components/SummaryCard';
 import { ApiError } from '../../services/api';
-import { listDevices } from '../../services/deviceApi';
-import { listSales } from '../../services/saleApi';
-import type { Device } from '../../types/device';
+import { getDashboard } from '../../services/dashboardApi';
 import type {
-  PaymentMethod,
-  Sale,
-  SalePayment,
-} from '../../types/sale';
+  DashboardRecentDevice,
+  DashboardRecentSale,
+  DashboardResponse,
+  DashboardSalePayment,
+} from '../../types/dashboard';
 import { formatCurrency } from '../../utils/currency';
 
 import './styles.scss';
@@ -41,8 +40,16 @@ interface DatePeriod {
   endDate: string;
 }
 
-function getStatusLabel(status: Device['status']) {
-  const labels: Record<Device['status'], string> = {
+type DashboardPaymentMethod =
+  DashboardSalePayment['method'];
+
+function getStatusLabel(
+  status: DashboardRecentDevice['status'],
+) {
+  const labels: Record<
+    DashboardRecentDevice['status'],
+    string
+  > = {
     PENDENTE_INFORMACOES: 'Pendente de informações',
     DISPONIVEL: 'Disponível',
     RESERVADO: 'Reservado',
@@ -52,8 +59,13 @@ function getStatusLabel(status: Device['status']) {
   return labels[status];
 }
 
-function getConditionLabel(condition: Device['condition']) {
-  const labels: Record<Device['condition'], string> = {
+function getConditionLabel(
+  condition: DashboardRecentDevice['condition'],
+) {
+  const labels: Record<
+    DashboardRecentDevice['condition'],
+    string
+  > = {
     NOVO: 'Novo',
     SEMINOVO: 'Seminovo',
     USADO: 'Usado',
@@ -62,8 +74,13 @@ function getConditionLabel(condition: Device['condition']) {
   return labels[condition];
 }
 
-function getPaymentMethodLabel(paymentMethod: PaymentMethod) {
-  const labels: Record<PaymentMethod, string> = {
+function getPaymentMethodLabel(
+  paymentMethod: DashboardPaymentMethod,
+) {
+  const labels: Record<
+    DashboardPaymentMethod,
+    string
+  > = {
     PIX: 'Pix',
     DINHEIRO: 'Dinheiro',
     CARTAO_CREDITO: 'Cartão de crédito',
@@ -76,7 +93,9 @@ function getPaymentMethodLabel(paymentMethod: PaymentMethod) {
   return labels[paymentMethod];
 }
 
-function getSalePayments(sale: Sale): SalePayment[] {
+function getSalePayments(
+  sale: DashboardRecentSale,
+): DashboardSalePayment[] {
   if (sale.payments?.length > 0) {
     return sale.payments;
   }
@@ -94,7 +113,9 @@ function getSalePayments(sale: Sale): SalePayment[] {
   ];
 }
 
-function getPaymentDescription(payment: SalePayment) {
+function getPaymentDescription(
+  payment: DashboardSalePayment,
+) {
   const label = getPaymentMethodLabel(payment.method);
 
   if (
@@ -107,7 +128,9 @@ function getPaymentDescription(payment: SalePayment) {
   return label;
 }
 
-function getPaymentSummary(sale: Sale) {
+function getPaymentSummary(
+  sale: DashboardRecentSale,
+) {
   const descriptions = getSalePayments(sale).map(
     getPaymentDescription,
   );
@@ -271,8 +294,12 @@ function getPeriodLabel(
 }
 
 export function Dashboard() {
-  const [devices, setDevices] = useState<Device[]>([]);
-  const [sales, setSales] = useState<Sale[]>([]);
+  const [
+    dashboard,
+    setDashboard,
+  ] = useState<DashboardResponse | null>(
+    null,
+  );
 
   const [
     periodFilter,
@@ -290,36 +317,79 @@ export function Dashboard() {
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
 
+  const selectedPeriod =
+    useMemo<DatePeriod>(() => {
+      if (
+        periodFilter ===
+        'PERSONALIZADO'
+      ) {
+        return {
+          startDate:
+            customStartDate,
+          endDate:
+            customEndDate,
+        };
+      }
+
+      return getPresetPeriod(
+        periodFilter,
+      );
+    }, [
+      periodFilter,
+      customStartDate,
+      customEndDate,
+    ]);
+
+  const isDateRangeInvalid =
+    selectedPeriod.startDate !== '' &&
+    selectedPeriod.endDate !== '' &&
+    selectedPeriod.startDate >
+      selectedPeriod.endDate;
+
   useEffect(() => {
     let isMounted = true;
+
+    if (isDateRangeInvalid) {
+      setIsLoading(false);
+      return () => {
+        isMounted = false;
+      };
+    }
 
     async function loadDashboard() {
       setIsLoading(true);
       setLoadError('');
 
       try {
-        const [devicesResponse, salesResponse] =
-          await Promise.all([
-            listDevices(),
-            listSales(),
-          ]);
+        const response =
+          await getDashboard({
+            startDate:
+              selectedPeriod.startDate ||
+              undefined,
+
+            endDate:
+              selectedPeriod.endDate ||
+              undefined,
+          });
 
         if (!isMounted) {
           return;
         }
 
-        setDevices(devicesResponse);
-        setSales(salesResponse.data);
+        setDashboard(response);
       } catch (error) {
         if (!isMounted) {
           return;
         }
 
-        setDevices([]);
-        setSales([]);
+        setDashboard(null);
 
-        if (error instanceof ApiError) {
-          setLoadError(error.message);
+        if (
+          error instanceof ApiError
+        ) {
+          setLoadError(
+            error.message,
+          );
         } else {
           setLoadError(
             'Não foi possível carregar o Dashboard. Verifique se a API está funcionando.',
@@ -337,158 +407,37 @@ export function Dashboard() {
     return () => {
       isMounted = false;
     };
-  }, []);
-
-  const pendingDevices = useMemo(
-    () =>
-      devices.filter(
-        (device) =>
-          device.status === 'PENDENTE_INFORMACOES',
-      ),
-    [devices],
-  );
-
-  const availableDevices = useMemo(
-    () =>
-      devices.filter(
-        (device) => device.status === 'DISPONIVEL',
-      ),
-    [devices],
-  );
-
-  const reservedDevices = useMemo(
-    () =>
-      devices.filter(
-        (device) => device.status === 'RESERVADO',
-      ),
-    [devices],
-  );
-
-  const inventoryValue = useMemo(
-    () =>
-      devices
-        .filter(
-          (device) => device.status !== 'VENDIDO',
-        )
-        .reduce(
-          (total, device) =>
-            total + (device.salePrice ?? 0),
-          0,
-        ),
-    [devices],
-  );
-
-  const recentDevices = useMemo(
-    () =>
-      [...devices]
-        .sort((firstDevice, secondDevice) => {
-          const firstDate = new Date(
-            firstDevice.createdAt ||
-            firstDevice.entryDate,
-          ).getTime();
-
-          const secondDate = new Date(
-            secondDevice.createdAt ||
-            secondDevice.entryDate,
-          ).getTime();
-
-          return secondDate - firstDate;
-        })
-        .slice(0, 5),
-    [devices],
-  );
-
-  const selectedPeriod = useMemo<DatePeriod>(() => {
-    if (periodFilter === 'PERSONALIZADO') {
-      return {
-        startDate: customStartDate,
-        endDate: customEndDate,
-      };
-    }
-
-    return getPresetPeriod(periodFilter);
   }, [
-    periodFilter,
-    customStartDate,
-    customEndDate,
-  ]);
-
-  const isDateRangeInvalid =
-    selectedPeriod.startDate !== '' &&
-    selectedPeriod.endDate !== '' &&
-    selectedPeriod.startDate > selectedPeriod.endDate;
-
-  const filteredSales = useMemo(() => {
-    if (isDateRangeInvalid) {
-      return [];
-    }
-
-    return [...sales]
-      .filter((sale) => {
-        const saleDate = sale.soldAt.slice(0, 10);
-
-        const matchesStartDate =
-          selectedPeriod.startDate === '' ||
-          saleDate >= selectedPeriod.startDate;
-
-        const matchesEndDate =
-          selectedPeriod.endDate === '' ||
-          saleDate <= selectedPeriod.endDate;
-
-        return matchesStartDate && matchesEndDate;
-      })
-      .sort((firstSale, secondSale) => {
-        const soldAtDifference =
-          new Date(secondSale.soldAt).getTime() -
-          new Date(firstSale.soldAt).getTime();
-
-        if (soldAtDifference !== 0) {
-          return soldAtDifference;
-        }
-
-        return (
-          new Date(secondSale.createdAt).getTime() -
-          new Date(firstSale.createdAt).getTime()
-        );
-      });
-  }, [
-    sales,
-    selectedPeriod,
+    selectedPeriod.startDate,
+    selectedPeriod.endDate,
     isDateRangeInvalid,
   ]);
 
-  const salesMetrics = useMemo(() => {
-    const totalRevenue = filteredSales.reduce(
-      (total, sale) => total + sale.salePrice,
-      0,
-    );
-
-    const totalProfit = filteredSales.reduce(
-      (total, sale) =>
-        total +
-        (sale.salePrice - sale.purchasePrice),
-      0,
-    );
-
-    const totalSales = filteredSales.length;
-
-    const averageTicket =
-      totalSales > 0
-        ? totalRevenue / totalSales
-        : 0;
-
-    return {
-      totalRevenue,
-      totalProfit,
-      totalSales,
-      averageTicket,
+  const stock =
+    dashboard?.stock ?? {
+      total: 0,
+      pending: 0,
+      available: 0,
+      reserved: 0,
+      sold: 0,
+      inventoryValue: 0,
     };
-  }, [filteredSales]);
 
-  const recentSales = useMemo(
-    () => filteredSales.slice(0, 5),
-    [filteredSales],
-  );
+  const salesMetrics =
+    dashboard?.sales ?? {
+      totalRevenue: 0,
+      totalProfit: 0,
+      totalCommission: 0,
+      totalProfitAfterCommission: 0,
+      totalSales: 0,
+      averageTicket: 0,
+    };
+
+  const recentDevices =
+    dashboard?.recentDevices ?? [];
+
+  const recentSales =
+    dashboard?.recentSales ?? [];
 
   const periodLabel = getPeriodLabel(
     periodFilter,
@@ -518,7 +467,7 @@ export function Dashboard() {
   }
 
   function handleClearPeriod() {
-    setPeriodFilter('TODOS');
+    setPeriodFilter('HOJE');
     setCustomStartDate('');
     setCustomEndDate('');
   }
@@ -678,15 +627,15 @@ export function Dashboard() {
           <section className="dashboard__summary">
             <SummaryCard
               title="Total de aparelhos"
-              value={devices.length}
-              description={`${availableDevices.length} disponíveis, ${reservedDevices.length} reservados e ${pendingDevices.length} pendentes`}
+              value={stock.total}
+              description={`${stock.available} disponíveis, ${stock.reserved} reservados e ${stock.pending} pendentes`}
               icon={Smartphone}
               variant="blue"
             />
 
             <SummaryCard
               title="Disponíveis"
-              value={availableDevices.length}
+              value={stock.available}
               description="Aparelhos liberados para venda"
               icon={PackageCheck}
               variant="green"
@@ -694,7 +643,7 @@ export function Dashboard() {
 
             <SummaryCard
               title="Informações pendentes"
-              value={pendingDevices.length}
+              value={stock.pending}
               description="Aparelhos que precisam ser completados"
               icon={AlertCircle}
               variant="yellow"
@@ -702,7 +651,9 @@ export function Dashboard() {
 
             <SummaryCard
               title="Valor do estoque"
-              value={formatCurrency(inventoryValue)}
+              value={formatCurrency(
+                stock.inventoryValue,
+              )}
               description="Considera aparelhos não vendidos com valor definido"
               icon={CircleDollarSign}
               variant="purple"
@@ -723,17 +674,20 @@ export function Dashboard() {
             </article>
 
             <article className="dashboard__financial-card">
-              <span>Lucro total</span>
+              <span>
+                Lucro após comissão
+              </span>
 
               <strong>
                 {formatCurrency(
-                  salesMetrics.totalProfit,
+                  salesMetrics
+                    .totalProfitAfterCommission,
                 )}
               </strong>
 
               <small>
-                Diferença entre vendas e compras no
-                período
+                Vendas menos compras e
+                comissões no período
               </small>
             </article>
 
@@ -966,7 +920,8 @@ export function Dashboard() {
                 {recentSales.map((sale) => {
                   const profit =
                     sale.salePrice -
-                    sale.purchasePrice;
+                    sale.purchasePrice -
+                    sale.commissionAmount;
 
                   return (
                     <article

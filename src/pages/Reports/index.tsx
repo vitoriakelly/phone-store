@@ -58,15 +58,39 @@ type PaymentFilter =
   | 'TODOS'
   | PaymentMethod;
 
+function getCurrentDate() {
+  const currentDate = new Date();
+
+  const timezoneOffset =
+    currentDate.getTimezoneOffset() *
+    60_000;
+
+  return new Date(
+    currentDate.getTime() -
+      timezoneOffset,
+  )
+    .toISOString()
+    .split('T')[0];
+}
+
+const currentDate =
+  getCurrentDate();
+
 const initialSalesFilters: SalesReportFilters = {
-  startDate: '',
-  endDate: '',
+  startDate: currentDate,
+  endDate: currentDate,
   imei: '',
   customerName: '',
   deviceName: '',
   sellerId: '',
 };
 
+/*
+ * O relatório de dispositivos sempre
+ * inicia contemplando todo o estoque.
+ * As datas só são aplicadas quando o
+ * usuário preencher os filtros.
+ */
 const initialDevicesFilters: DevicesReportFilters = {
   startDate: '',
   endDate: '',
@@ -78,8 +102,8 @@ const initialDevicesFilters: DevicesReportFilters = {
 
 const initialCommissionsFilters:
   CommissionsReportFilters = {
-    startDate: '',
-    endDate: '',
+    startDate: currentDate,
+    endDate: currentDate,
     sellerId: '',
   };
 
