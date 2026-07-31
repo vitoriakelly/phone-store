@@ -1,4 +1,8 @@
-import type { Device } from '../types/device';
+import type {
+  Device,
+  DeviceCondition,
+  DeviceStatus,
+} from '../types/device';
 
 import { apiRequest } from './api';
 
@@ -21,39 +25,174 @@ export interface CreateDeviceInput {
 export type UpdateDeviceInput =
   Partial<CreateDeviceInput>;
 
+export interface DeviceListFilters {
+  page?: number;
+  search?: string;
+  status?: DeviceStatus;
+  condition?: DeviceCondition;
+  startDate?: string;
+  endDate?: string;
+}
+
+export interface DeviceListMeta {
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+  hasPreviousPage: boolean;
+  hasNextPage: boolean;
+}
+
+export interface DeviceListResponse {
+  data: Device[];
+  meta: DeviceListMeta;
+
+  filters: {
+    page: number;
+    search?: string;
+    status?: DeviceStatus;
+    condition?: DeviceCondition;
+    startDate?: string;
+    endDate?: string;
+  };
+}
+
 interface DeviceResponse {
   message: string;
   data: Device;
-}
-
-interface DeviceListResponse {
-  data: Device[];
-  meta: {
-    total: number;
-  };
 }
 
 interface DeviceDetailsResponse {
   data: Device;
 }
 
-export async function listDevices(): Promise<Device[]> {
-  const response =
-    await apiRequest<DeviceListResponse>('/devices');
+function createQueryString(
+  filters: DeviceListFilters,
+) {
+  const searchParams =
+    new URLSearchParams();
 
-  return response.data;
+  if (filters.page) {
+    searchParams.set(
+      'page',
+      String(filters.page),
+    );
+  }
+
+  if (filters.search?.trim()) {
+    searchParams.set(
+      'search',
+      filters.search.trim(),
+    );
+  }
+
+  if (filters.status) {
+    searchParams.set(
+      'status',
+      filters.status,
+    );
+  }
+
+  if (filters.condition) {
+    searchParams.set(
+      'condition',
+      filters.condition,
+    );
+  }
+
+  if (filters.startDate) {
+    searchParams.set(
+      'startDate',
+      filters.startDate,
+    );
+  }
+
+  if (filters.endDate) {
+    searchParams.set(
+      'endDate',
+      filters.endDate,
+    );
+  }
+
+  const queryString =
+    searchParams.toString();
+
+  return queryString
+    ? `?${queryString}`
+    : '';
+}
+
+/*
+ * Usado pela tela principal de dispositivos.
+ * Retorna somente uma página de 10 registros.
+ */
+export async function listDevicesPage(
+  filters: DeviceListFilters = {},
+): Promise<DeviceListResponse> {
+  return apiRequest<DeviceListResponse>(
+    `/devices${createQueryString(
+      filters,
+    )}`,
+  );
+}
+
+/*
+ * Mantido para não quebrar formulários antigos
+ * que chamam listDevices() esperando um array.
+ *
+ * Para novos selects, o ideal é criar um endpoint
+ * específico de opções disponíveis.
+ */
+export async function listDevices(): Promise<
+  Device[]
+> {
+  const firstPage =
+    await listDevicesPage({
+      page: 1,
+    });
+
+  if (
+    firstPage.meta.totalPages <= 1
+  ) {
+    return firstPage.data;
+  }
+
+  const remainingPages =
+    await Promise.all(
+      Array.from(
+        {
+          length:
+            firstPage.meta.totalPages -
+            1,
+        },
+        (_, index) =>
+          listDevicesPage({
+            page: index + 2,
+          }),
+      ),
+    );
+
+  return [
+    ...firstPage.data,
+
+    ...remainingPages.flatMap(
+      (response) =>
+        response.data,
+    ),
+  ];
 }
 
 export async function createDevice(
   data: CreateDeviceInput,
 ): Promise<Device> {
-  const response = await apiRequest<DeviceResponse>(
-    '/devices',
-    {
-      method: 'POST',
-      body: JSON.stringify(data),
-    },
-  );
+  const response =
+    await apiRequest<DeviceResponse>(
+      '/devices',
+      {
+        method: 'POST',
+        body: JSON.stringify(data),
+      },
+    );
 
   return response.data;
 }
@@ -73,13 +212,14 @@ export async function updateDevice(
   deviceId: string,
   data: UpdateDeviceInput,
 ): Promise<Device> {
-  const response = await apiRequest<DeviceResponse>(
-    `/devices/${deviceId}`,
-    {
-      method: 'PATCH',
-      body: JSON.stringify(data),
-    },
-  );
+  const response =
+    await apiRequest<DeviceResponse>(
+      `/devices/${deviceId}`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+      },
+    );
 
   return response.data;
 }
@@ -87,7 +227,10 @@ export async function updateDevice(
 export async function deleteDevice(
   deviceId: string,
 ): Promise<void> {
-  await apiRequest<void>(`/devices/${deviceId}`, {
-    method: 'DELETE',
-  });
+  await apiRequest<void>(
+    `/devices/${deviceId}`,
+    {
+      method: 'DELETE',
+    },
+  );
 }

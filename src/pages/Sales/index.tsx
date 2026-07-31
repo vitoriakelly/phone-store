@@ -9,7 +9,6 @@ import {
 } from 'lucide-react';
 import {
   useEffect,
-  useMemo,
   useState,
 } from 'react';
 import { Link } from 'react-router-dom';
@@ -42,9 +41,17 @@ type ConditionFilter =
   | DeviceCondition;
 
 const initialSummary: SaleSummary = {
+  page: 1,
+  pageSize: 10,
   total: 0,
+  totalPages: 0,
+  hasPreviousPage: false,
+  hasNextPage: false,
   totalRevenue: 0,
   totalProfit: 0,
+  totalCommission: 0,
+  totalProfitAfterCommission: 0,
+  averageTicket: 0,
 };
 
 function formatDate(date: string) {
@@ -55,9 +62,6 @@ function formatDate(date: string) {
   );
 }
 
-function getDateOnly(value: string) {
-  return value.slice(0, 10);
-}
 
 function getConditionLabel(
   condition:
@@ -183,18 +187,6 @@ function getPaymentTitle(
     .join(' | ');
 }
 
-function saleHasPaymentMethod(
-  sale: Sale,
-  paymentMethod: PaymentMethod,
-) {
-  return getSalePayments(
-    sale,
-  ).some(
-    (payment) =>
-      payment.method ===
-      paymentMethod,
-  );
-}
 
 export function Sales() {
   const [sales, setSales] =
@@ -246,6 +238,9 @@ export function Sales() {
   const [endDate, setEndDate] =
     useState('');
 
+  const [page, setPage] =
+    useState(1);
+
   const [isLoading, setIsLoading] =
     useState(true);
 
@@ -268,57 +263,106 @@ export function Sales() {
   useEffect(() => {
     let isMounted = true;
 
-    async function loadSales() {
-      setIsLoading(true);
-      setLoadError('');
+    if (isDateRangeInvalid) {
+      setSales([]);
+      setSummary(initialSummary);
+      setIsLoading(false);
 
-      try {
-        const response =
-          await listSales({
-            sellerId:
-              sellerFilter === 'TODOS'
-                ? undefined
-                : sellerFilter,
-          });
-
-        if (!isMounted) {
-          return;
-        }
-
-        setSales(response.data);
-        setSummary(response.meta);
-      } catch (error) {
-        if (!isMounted) {
-          return;
-        }
-
-        setSales([]);
-        setSummary(initialSummary);
-
-        if (
-          error instanceof ApiError
-        ) {
-          setLoadError(
-            error.message,
-          );
-        } else {
-          setLoadError(
-            'Não foi possível carregar as vendas. Verifique se a API está funcionando.',
-          );
-        }
-      } finally {
-        if (isMounted) {
-          setIsLoading(false);
-        }
-      }
+      return () => {
+        isMounted = false;
+      };
     }
 
-    void loadSales();
+    const timeout =
+      window.setTimeout(
+        async () => {
+          setIsLoading(true);
+          setLoadError('');
+
+          try {
+            const response =
+              await listSales({
+                page,
+
+                search:
+                  search.trim() ||
+                  undefined,
+
+                paymentMethod:
+                  paymentFilter ===
+                  'TODOS'
+                    ? undefined
+                    : paymentFilter,
+
+                sellerId:
+                  sellerFilter ===
+                  'TODOS'
+                    ? undefined
+                    : sellerFilter,
+
+                deviceCondition:
+                  conditionFilter ===
+                  'TODOS'
+                    ? undefined
+                    : conditionFilter,
+
+                startDate:
+                  startDate ||
+                  undefined,
+
+                endDate:
+                  endDate ||
+                  undefined,
+              });
+
+            if (!isMounted) {
+              return;
+            }
+
+            setSales(response.data);
+            setSummary(response.meta);
+          } catch (error) {
+            if (!isMounted) {
+              return;
+            }
+
+            setSales([]);
+            setSummary(initialSummary);
+
+            if (
+              error instanceof ApiError
+            ) {
+              setLoadError(
+                error.message,
+              );
+            } else {
+              setLoadError(
+                'Não foi possível carregar as vendas. Verifique se a API está funcionando.',
+              );
+            }
+          } finally {
+            if (isMounted) {
+              setIsLoading(false);
+            }
+          }
+        },
+        350,
+      );
 
     return () => {
       isMounted = false;
+      window.clearTimeout(timeout);
     };
-  }, [sellerFilter]);
+  }, [
+    page,
+    search,
+    paymentFilter,
+    sellerFilter,
+    conditionFilter,
+    startDate,
+    endDate,
+    isDateRangeInvalid,
+  ]);
 
   useEffect(() => {
     let isMounted = true;
@@ -366,144 +410,9 @@ export function Sales() {
     };
   }, []);
 
-  const filteredSales =
-    useMemo(() => {
-      if (isDateRangeInvalid) {
-        return [];
-      }
-
-      const normalizedSearch =
-        search
-          .trim()
-          .toLowerCase();
-
-      return [...sales]
-        .filter((sale) => {
-          const paymentContent =
-            getSalePayments(sale)
-              .map(
-                (payment) =>
-                  getPaymentMethodLabel(
-                    payment.method,
-                  ),
-              )
-              .join(' ');
-
-          const searchableContent =
-            [
-              sale.customerName,
-              sale.sellerName,
-              sale.customerPhone,
-              sale.customerSocialNetwork,
-              sale.customerCity,
-              sale.deviceBrand,
-              sale.deviceModel,
-              sale.deviceImei,
-              getConditionLabel(
-                sale.deviceCondition,
-              ),
-              sale.deviceCondition,
-              paymentContent,
-            ]
-              .filter(Boolean)
-              .join(' ')
-              .toLowerCase();
-
-          const matchesSearch =
-            normalizedSearch === '' ||
-            searchableContent.includes(
-              normalizedSearch,
-            );
-
-          const matchesPayment =
-            paymentFilter ===
-              'TODOS' ||
-            saleHasPaymentMethod(
-              sale,
-              paymentFilter,
-            );
-
-          const matchesCondition =
-            conditionFilter ===
-              'TODOS' ||
-            sale.deviceCondition ===
-              conditionFilter;
-
-          const saleDate =
-            getDateOnly(
-              sale.soldAt,
-            );
-
-          const matchesStartDate =
-            startDate === '' ||
-            saleDate >= startDate;
-
-          const matchesEndDate =
-            endDate === '' ||
-            saleDate <= endDate;
-
-          return (
-            matchesSearch &&
-            matchesPayment &&
-            matchesCondition &&
-            matchesStartDate &&
-            matchesEndDate
-          );
-        })
-        .sort(
-          (
-            firstSale,
-            secondSale,
-          ) =>
-            new Date(
-              secondSale.createdAt,
-            ).getTime() -
-            new Date(
-              firstSale.createdAt,
-            ).getTime(),
-        );
-    }, [
-      sales,
-      search,
-      paymentFilter,
-      conditionFilter,
-      startDate,
-      endDate,
-      isDateRangeInvalid,
-    ]);
-
-  const filteredRevenue =
-    filteredSales.reduce(
-      (total, sale) =>
-        total + sale.salePrice,
-      0,
-    );
-
-  const filteredProfit =
-    filteredSales.reduce(
-      (total, sale) =>
-        total +
-        (sale.salePrice -
-          sale.purchasePrice),
-      0,
-    );
-
-  const displayedTotal =
-    hasActiveFilters
-      ? filteredSales.length
-      : summary.total;
-
-  const displayedRevenue =
-    hasActiveFilters
-      ? filteredRevenue
-      : summary.totalRevenue;
-
-  const displayedProfit =
-    hasActiveFilters
-      ? filteredProfit
-      : summary.totalProfit;
 
   function handleClearFilters() {
+    setPage(1);
     setSearch('');
     setPaymentFilter('TODOS');
     setSellerFilter('TODOS');
@@ -541,7 +450,7 @@ export function Sales() {
             <strong>
               {isLoading
                 ? '—'
-                : displayedTotal}
+                : summary.total}
             </strong>
           </div>
         </article>
@@ -560,7 +469,7 @@ export function Sales() {
               {isLoading
                 ? '—'
                 : formatCurrency(
-                    displayedRevenue,
+                    summary.totalRevenue,
                   )}
             </strong>
           </div>
@@ -580,7 +489,7 @@ export function Sales() {
               {isLoading
                 ? '—'
                 : formatCurrency(
-                    displayedProfit,
+                    summary.totalProfit,
                   )}
             </strong>
           </div>
@@ -595,12 +504,13 @@ export function Sales() {
             <input
               type="search"
               value={search}
-              onChange={(event) =>
+              onChange={(event) => {
+                setPage(1);
                 setSearch(
                   event.target.value,
-                )
-              }
-              placeholder="Pesquisar cliente, vendedor, condição, aparelho, IMEI ou pagamento"
+                );
+              }}
+              placeholder="Pesquisar cliente, vendedor, aparelho, IMEI, telefone, cidade ou rede social"
               aria-label="Pesquisar vendas"
               disabled={isLoading}
             />
@@ -608,12 +518,13 @@ export function Sales() {
 
           <select
             value={paymentFilter}
-            onChange={(event) =>
+            onChange={(event) => {
+              setPage(1);
               setPaymentFilter(
                 event.target
                   .value as PaymentFilter,
-              )
-            }
+              );
+            }}
             aria-label="Filtrar por forma de pagamento"
             disabled={isLoading}
           >
@@ -652,11 +563,12 @@ export function Sales() {
 
           <select
             value={sellerFilter}
-            onChange={(event) =>
+            onChange={(event) => {
+              setPage(1);
               setSellerFilter(
                 event.target.value,
-              )
-            }
+              );
+            }}
             aria-label="Filtrar por vendedor"
             disabled={
               isLoading ||
@@ -685,12 +597,13 @@ export function Sales() {
 
           <select
             value={conditionFilter}
-            onChange={(event) =>
+            onChange={(event) => {
+              setPage(1);
               setConditionFilter(
                 event.target
                   .value as ConditionFilter,
-              )
-            }
+              );
+            }}
             aria-label="Filtrar por condição do dispositivo"
             disabled={isLoading}
           >
@@ -723,11 +636,12 @@ export function Sales() {
               type="date"
               value={startDate}
               max={endDate || undefined}
-              onChange={(event) =>
+              onChange={(event) => {
+                setPage(1);
                 setStartDate(
                   event.target.value,
-                )
-              }
+                );
+              }}
               aria-label="Data inicial da venda"
               disabled={isLoading}
             />
@@ -745,11 +659,12 @@ export function Sales() {
               type="date"
               value={endDate}
               min={startDate || undefined}
-              onChange={(event) =>
+              onChange={(event) => {
+                setPage(1);
                 setEndDate(
                   event.target.value,
-                )
-              }
+                );
+              }}
               aria-label="Data final da venda"
               disabled={isLoading}
             />
@@ -808,7 +723,7 @@ export function Sales() {
               Carregando vendas...
             </span>
           </div>
-        ) : loadError ? null : filteredSales.length >
+        ) : loadError ? null : sales.length >
           0 ? (
           <>
             <div className="sales__table-container">
@@ -828,7 +743,7 @@ export function Sales() {
                 </thead>
 
                 <tbody>
-                  {filteredSales.map(
+                  {sales.map(
                     (sale) => {
                       const profit =
                         sale.salePrice -
@@ -964,7 +879,7 @@ export function Sales() {
             </div>
 
             <div className="sales__mobile-list">
-              {filteredSales.map(
+              {sales.map(
                 (sale) => {
                   const profit =
                     sale.salePrice -
@@ -1116,6 +1031,72 @@ export function Sales() {
                   );
                 },
               )}
+            </div>
+
+            <div className="sales__pagination">
+              <span>
+                {summary.total === 0
+                  ? 'Nenhum resultado'
+                  : `Exibindo ${
+                      (summary.page - 1) *
+                        summary.pageSize +
+                      1
+                    }–${Math.min(
+                      summary.page *
+                        summary.pageSize,
+                      summary.total,
+                    )} de ${
+                      summary.total
+                    } resultados`}
+              </span>
+
+              <div className="sales__pagination-actions">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setPage(
+                      (currentPage) =>
+                        Math.max(
+                          1,
+                          currentPage - 1,
+                        ),
+                    )
+                  }
+                  disabled={
+                    isLoading ||
+                    !summary.hasPreviousPage
+                  }
+                >
+                  Anterior
+                </button>
+
+                <strong>
+                  Página{' '}
+                  {summary.totalPages === 0
+                    ? 1
+                    : summary.page}{' '}
+                  de{' '}
+                  {summary.totalPages === 0
+                    ? 1
+                    : summary.totalPages}
+                </strong>
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    setPage(
+                      (currentPage) =>
+                        currentPage + 1,
+                    )
+                  }
+                  disabled={
+                    isLoading ||
+                    !summary.hasNextPage
+                  }
+                >
+                  Próxima
+                </button>
+              </div>
             </div>
           </>
         ) : (

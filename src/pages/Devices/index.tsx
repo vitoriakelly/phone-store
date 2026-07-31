@@ -10,7 +10,6 @@ import {
 } from 'lucide-react';
 import {
   useEffect,
-  useMemo,
   useState,
 } from 'react';
 import {
@@ -22,7 +21,8 @@ import {
 import { ApiError } from '../../services/api';
 import {
   deleteDevice,
-  listDevices,
+  listDevicesPage,
+  type DeviceListMeta,
 } from '../../services/deviceApi';
 import type {
   Device,
@@ -44,6 +44,15 @@ type ConditionFilter =
 interface LocationState {
   successMessage?: string;
 }
+
+const initialMeta: DeviceListMeta = {
+  page: 1,
+  pageSize: 10,
+  total: 0,
+  totalPages: 0,
+  hasPreviousPage: false,
+  hasNextPage: false,
+};
 
 function getStatusLabel(
   status: DeviceStatus,
@@ -102,9 +111,6 @@ function getOptionalValue(
   return value || fallback;
 }
 
-function getDateOnly(value: string) {
-  return value.slice(0, 10);
-}
 
 export function Devices() {
   const location = useLocation();
@@ -115,6 +121,19 @@ export function Devices() {
 
   const [devices, setDevices] =
     useState<Device[]>([]);
+
+  const [meta, setMeta] =
+    useState<DeviceListMeta>(
+      initialMeta,
+    );
+
+  const [page, setPage] =
+    useState(1);
+
+  const [
+    refreshKey,
+    setRefreshKey,
+  ] = useState(0);
 
   const [search, setSearch] =
     useState('');
@@ -173,42 +192,100 @@ export function Devices() {
   useEffect(() => {
     let isMounted = true;
 
-    async function loadDevices() {
-      setIsLoading(true);
-      setLoadError('');
+    if (isDateRangeInvalid) {
+      setDevices([]);
+      setMeta(initialMeta);
+      setIsLoading(false);
 
-      try {
-        const apiDevices =
-          await listDevices();
-
-        if (isMounted) {
-          setDevices(apiDevices);
-        }
-      } catch (error) {
-        if (!isMounted) {
-          return;
-        }
-
-        if (error instanceof ApiError) {
-          setLoadError(error.message);
-        } else {
-          setLoadError(
-            'Não foi possível carregar os dispositivos. Verifique se a API está funcionando.',
-          );
-        }
-      } finally {
-        if (isMounted) {
-          setIsLoading(false);
-        }
-      }
+      return () => {
+        isMounted = false;
+      };
     }
 
-    void loadDevices();
+    const timeout =
+      window.setTimeout(
+        async () => {
+          setIsLoading(true);
+          setLoadError('');
+
+          try {
+            const response =
+              await listDevicesPage({
+                page,
+
+                search:
+                  search.trim() ||
+                  undefined,
+
+                status:
+                  statusFilter ===
+                  'TODOS'
+                    ? undefined
+                    : statusFilter,
+
+                condition:
+                  conditionFilter ===
+                  'TODOS'
+                    ? undefined
+                    : conditionFilter,
+
+                startDate:
+                  startDate ||
+                  undefined,
+
+                endDate:
+                  endDate ||
+                  undefined,
+              });
+
+            if (!isMounted) {
+              return;
+            }
+
+            setDevices(response.data);
+            setMeta(response.meta);
+          } catch (error) {
+            if (!isMounted) {
+              return;
+            }
+
+            setDevices([]);
+            setMeta(initialMeta);
+
+            if (
+              error instanceof ApiError
+            ) {
+              setLoadError(
+                error.message,
+              );
+            } else {
+              setLoadError(
+                'Não foi possível carregar os dispositivos. Verifique se a API está funcionando.',
+              );
+            }
+          } finally {
+            if (isMounted) {
+              setIsLoading(false);
+            }
+          }
+        },
+        350,
+      );
 
     return () => {
       isMounted = false;
+      window.clearTimeout(timeout);
     };
-  }, []);
+  }, [
+    page,
+    search,
+    statusFilter,
+    conditionFilter,
+    startDate,
+    endDate,
+    isDateRangeInvalid,
+    refreshKey,
+  ]);
 
   useEffect(() => {
     if (!successMessage) {
@@ -234,108 +311,8 @@ export function Devices() {
     successMessage,
   ]);
 
-  const filteredDevices =
-    useMemo(() => {
-      if (isDateRangeInvalid) {
-        return [];
-      }
-
-      const normalizedSearch =
-        search
-          .trim()
-          .toLowerCase();
-
-      return [...devices]
-        .filter((device) => {
-          const matchesStatus =
-            statusFilter ===
-              'TODOS' ||
-            device.status ===
-              statusFilter;
-
-          const matchesCondition =
-            conditionFilter ===
-              'TODOS' ||
-            device.condition ===
-              conditionFilter;
-
-          const searchableContent =
-            [
-              device.brand,
-              device.model,
-              device.imei ?? '',
-              device.color ?? '',
-              device.storage,
-              device.supplier ?? '',
-              getConditionLabel(
-                device.condition,
-              ),
-              device.condition,
-            ]
-              .join(' ')
-              .toLowerCase();
-
-          const matchesSearch =
-            normalizedSearch === '' ||
-            searchableContent.includes(
-              normalizedSearch,
-            );
-
-          const entryDate =
-            getDateOnly(
-              device.entryDate,
-            );
-
-          const matchesStartDate =
-            startDate === '' ||
-            entryDate >= startDate;
-
-          const matchesEndDate =
-            endDate === '' ||
-            entryDate <= endDate;
-
-          return (
-            matchesStatus &&
-            matchesCondition &&
-            matchesSearch &&
-            matchesStartDate &&
-            matchesEndDate
-          );
-        })
-        .sort(
-          (
-            firstDevice,
-            secondDevice,
-          ) => {
-            const firstDate =
-              new Date(
-                firstDevice.createdAt ||
-                  firstDevice.entryDate,
-              ).getTime();
-
-            const secondDate =
-              new Date(
-                secondDevice.createdAt ||
-                  secondDevice.entryDate,
-              ).getTime();
-
-            return (
-              secondDate -
-              firstDate
-            );
-          },
-        );
-    }, [
-      devices,
-      search,
-      statusFilter,
-      conditionFilter,
-      startDate,
-      endDate,
-      isDateRangeInvalid,
-    ]);
-
   function handleClearFilters() {
+    setPage(1);
     setSearch('');
     setStatusFilter('TODOS');
     setConditionFilter('TODOS');
@@ -361,18 +338,24 @@ export function Devices() {
     try {
       await deleteDevice(device.id);
 
-      setDevices(
-        (currentDevices) =>
-          currentDevices.filter(
-            (currentDevice) =>
-              currentDevice.id !==
-              device.id,
-          ),
-      );
-
       setSuccessMessage(
         'Dispositivo excluído com sucesso.',
       );
+
+      if (
+        devices.length === 1 &&
+        page > 1
+      ) {
+        setPage(
+          (currentPage) =>
+            currentPage - 1,
+        );
+      } else {
+        setRefreshKey(
+          (currentValue) =>
+            currentValue + 1,
+        );
+      }
     } catch (error) {
       if (error instanceof ApiError) {
         window.alert(error.message);
@@ -434,11 +417,12 @@ export function Devices() {
             <input
               type="search"
               value={search}
-              onChange={(event) =>
+              onChange={(event) => {
+                setPage(1);
                 setSearch(
                   event.target.value,
-                )
-              }
+                );
+              }}
               placeholder="Pesquisar por marca, modelo, condição, IMEI, cor ou fornecedor"
               aria-label="Pesquisar dispositivos"
               disabled={isLoading}
@@ -447,12 +431,13 @@ export function Devices() {
 
           <select
             value={statusFilter}
-            onChange={(event) =>
+            onChange={(event) => {
+              setPage(1);
               setStatusFilter(
                 event.target
                   .value as StatusFilter,
-              )
-            }
+              );
+            }}
             aria-label="Filtrar por status"
             disabled={isLoading}
           >
@@ -479,12 +464,13 @@ export function Devices() {
 
           <select
             value={conditionFilter}
-            onChange={(event) =>
+            onChange={(event) => {
+              setPage(1);
               setConditionFilter(
                 event.target
                   .value as ConditionFilter,
-              )
-            }
+              );
+            }}
             aria-label="Filtrar por condição"
             disabled={isLoading}
           >
@@ -517,11 +503,12 @@ export function Devices() {
               type="date"
               value={startDate}
               max={endDate || undefined}
-              onChange={(event) =>
+              onChange={(event) => {
+                setPage(1);
                 setStartDate(
                   event.target.value,
-                )
-              }
+                );
+              }}
               aria-label="Data inicial de entrada"
               disabled={isLoading}
             />
@@ -539,11 +526,12 @@ export function Devices() {
               type="date"
               value={endDate}
               min={startDate || undefined}
-              onChange={(event) =>
+              onChange={(event) => {
+                setPage(1);
                 setEndDate(
                   event.target.value,
-                )
-              }
+                );
+              }}
               aria-label="Data final de entrada"
               disabled={isLoading}
             />
@@ -586,15 +574,15 @@ export function Devices() {
           <>
             <div className="devices__result">
               <strong>
-                {filteredDevices.length}{' '}
-                {filteredDevices.length ===
+                {meta.total}{' '}
+                {meta.total ===
                 1
                   ? 'dispositivo encontrado'
                   : 'dispositivos encontrados'}
               </strong>
             </div>
 
-            {filteredDevices.length >
+            {devices.length >
             0 ? (
               <>
                 <div className="devices__table-container">
@@ -616,7 +604,7 @@ export function Devices() {
                     </thead>
 
                     <tbody>
-                      {filteredDevices.map(
+                      {devices.map(
                         (device) => {
                           const isDeleting =
                             deletingDeviceId ===
@@ -783,7 +771,7 @@ export function Devices() {
                 </div>
 
                 <div className="devices__mobile-list">
-                  {filteredDevices.map(
+                  {devices.map(
                     (device) => {
                       const isDeleting =
                         deletingDeviceId ===
@@ -956,6 +944,72 @@ export function Devices() {
                       );
                     },
                   )}
+                </div>
+
+                <div className="devices__pagination">
+                  <span>
+                    {meta.total === 0
+                      ? 'Nenhum resultado'
+                      : `Exibindo ${
+                          (meta.page - 1) *
+                            meta.pageSize +
+                          1
+                        }–${Math.min(
+                          meta.page *
+                            meta.pageSize,
+                          meta.total,
+                        )} de ${
+                          meta.total
+                        } resultados`}
+                  </span>
+
+                  <div className="devices__pagination-actions">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setPage(
+                          (currentPage) =>
+                            Math.max(
+                              1,
+                              currentPage - 1,
+                            ),
+                        )
+                      }
+                      disabled={
+                        isLoading ||
+                        !meta.hasPreviousPage
+                      }
+                    >
+                      Anterior
+                    </button>
+
+                    <strong>
+                      Página{' '}
+                      {meta.totalPages === 0
+                        ? 1
+                        : meta.page}{' '}
+                      de{' '}
+                      {meta.totalPages === 0
+                        ? 1
+                        : meta.totalPages}
+                    </strong>
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setPage(
+                          (currentPage) =>
+                            currentPage + 1,
+                        )
+                      }
+                      disabled={
+                        isLoading ||
+                        !meta.hasNextPage
+                      }
+                    >
+                      Próxima
+                    </button>
+                  </div>
                 </div>
               </>
             ) : (
