@@ -131,14 +131,6 @@ export function Login() {
     <main className="login">
       <aside className="login__brand-area">
         <div className="login__brand">
-          <div className="login__brand-icon">
-            <Smartphone size={27} />
-          </div>
-
-          <div>
-            <strong>Phone Store</strong>
-            <span>Gestão de dispositivos</span>
-          </div>
         </div>
 
         <div className="login__brand-content">
@@ -276,11 +268,6 @@ export function Login() {
                 : 'Entrar'}
             </button>
           </form>
-
-          <p className="login__security">
-            Acesso exclusivo para usuários
-            autorizados.
-          </p>
         </div>
       </section>
     </main>
