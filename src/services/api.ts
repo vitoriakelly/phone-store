@@ -1,7 +1,17 @@
-const API_URL =
-  import.meta.env.VITE_API_URL ??
-  'http://localhost:3333';
+const configuredApiUrl =
+  import.meta.env.VITE_API_URL;
 
+const API_URL =
+  configuredApiUrl ??
+  (import.meta.env.DEV
+    ? 'http://localhost:3333'
+    : undefined);
+
+if (!API_URL) {
+  throw new Error(
+    'VITE_API_URL não foi configurada para o ambiente de produção.',
+  );
+}
 interface ApiValidationError {
   field?: string;
   message?: string;
