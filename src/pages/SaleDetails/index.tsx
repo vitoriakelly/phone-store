@@ -140,6 +140,26 @@ function getCustomerAddress(
   return addressParts.join(' · ');
 }
 
+function getCommissionLabel(
+  sale: Sale,
+) {
+  if (
+    !sale.commissionType ||
+    sale.commissionValue === null
+  ) {
+    return 'Comissão';
+  }
+
+  if (
+    sale.commissionType ===
+    'PERCENTAGE'
+  ) {
+    return `Comissão (${sale.commissionValue}%)`;
+  }
+
+  return 'Comissão fixa';
+}
+
 export function SaleDetails() {
   const { id } = useParams();
 
@@ -264,9 +284,24 @@ export function SaleDetails() {
     );
   }
 
-  const profit =
+  const grossSalePrice =
+    sale.grossSalePrice ??
+    sale.salePrice +
+      (sale.discountAmount ?? 0);
+
+  const discountAmount =
+    sale.discountAmount ?? 0;
+
+  const commissionAmount =
+    sale.commissionAmount ?? 0;
+
+  const profitBeforeCommission =
     sale.salePrice -
     sale.purchasePrice;
+
+  const profitAfterCommission =
+    profitBeforeCommission -
+    commissionAmount;
 
   /*
    * Compatibilidade com vendas antigas.
@@ -544,7 +579,31 @@ export function SaleDetails() {
 
             <article className="sale-details__price-card">
               <span>
-                Valor da venda
+                Valor bruto da venda
+              </span>
+
+              <strong>
+                {formatCurrency(
+                  grossSalePrice,
+                )}
+              </strong>
+            </article>
+
+            <article className="sale-details__price-card">
+              <span>Desconto</span>
+
+              <strong>
+                {discountAmount > 0
+                  ? `- ${formatCurrency(
+                      discountAmount,
+                    )}`
+                  : formatCurrency(0)}
+              </strong>
+            </article>
+
+            <article className="sale-details__price-card">
+              <span>
+                Valor líquido da venda
               </span>
 
               <strong>
@@ -555,10 +614,42 @@ export function SaleDetails() {
             </article>
 
             <article className="sale-details__price-card">
-              <span>Lucro obtido</span>
+              <span>
+                {getCommissionLabel(
+                  sale,
+                )}
+              </span>
 
               <strong>
-                {formatCurrency(profit)}
+                {commissionAmount > 0
+                  ? formatCurrency(
+                      commissionAmount,
+                    )
+                  : 'Sem comissão'}
+              </strong>
+            </article>
+
+            <article className="sale-details__price-card">
+              <span>
+                Lucro antes da comissão
+              </span>
+
+              <strong>
+                {formatCurrency(
+                  profitBeforeCommission,
+                )}
+              </strong>
+            </article>
+
+            <article className="sale-details__price-card">
+              <span>
+                Lucro após comissão
+              </span>
+
+              <strong>
+                {formatCurrency(
+                  profitAfterCommission,
+                )}
               </strong>
             </article>
           </div>
