@@ -76,7 +76,7 @@ export function AppRoutes() {
             />
 
             <Route
-              path="/funcionarios"
+              path="/colaboradores"
               element={<Employees />}
             />
           </Route>

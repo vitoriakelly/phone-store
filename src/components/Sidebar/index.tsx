@@ -176,7 +176,7 @@ export function Sidebar({
             </NavLink>
 
             <NavLink
-              to="/funcionarios"
+              to="/colaboradores"
               onClick={onClose}
               className={({
                 isActive,
