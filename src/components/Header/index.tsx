@@ -38,12 +38,11 @@ export function Header({
 
       <div className="header__title">
         <strong>
-          Gestão de dispositivos
+          Phone Store
         </strong>
 
         <span>
-          Controle os aparelhos da sua
-          loja
+          Painel de gestão da loja
         </span>
       </div>
 

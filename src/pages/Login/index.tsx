@@ -128,25 +128,22 @@ export function Login() {
 
   return (
     <main className="login">
-      <aside className="login__brand-area">
-        <div className="login__brand">
+      <aside className="login__brand-area" aria-hidden="true">
+        <div className="login__visual">
+          <span className="login__visual-device login__visual-device--back" />
+          <span className="login__visual-device login__visual-device--front" />
+          <span className="login__visual-glow" />
         </div>
 
         <div className="login__brand-content">
           <h1>
-            Sua loja organizada em um só lugar.
+            Estoque e vendas sob controle.
           </h1>
 
           <p>
-            Controle dispositivos, vendas e acessos
-            com simplicidade.
+            Acompanhe aparelhos, registre vendas e
+            gerencie a equipe em um só painel.
           </p>
-        </div>
-
-        <div className="login__decoration">
-          <span />
-          <span />
-          <span />
         </div>
       </aside>
 
@@ -154,14 +151,14 @@ export function Login() {
         <div className="login__card">
           <header className="login__card-header">
             <div className="login__card-icon">
-              <LockKeyhole size={23} />
+              <LockKeyhole size={22} />
             </div>
 
             <div>
-              <h2>Bem-vindo</h2>
+              <h2>Bem-vindo de volta</h2>
 
               <p>
-                Entre com suas credenciais.
+                Acesse com suas credenciais.
               </p>
             </div>
           </header>

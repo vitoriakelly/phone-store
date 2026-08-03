@@ -67,11 +67,11 @@ export function Sidebar({
     >
       <div className="sidebar__header">
         <div className="sidebar__logo">
-          <Smartphone size={24} />
+          <Smartphone size={20} />
 
           <div>
             <strong>Phone Store</strong>
-            <span>Gerenciamento</span>
+            <span>Gestão</span>
           </div>
         </div>
 
@@ -81,11 +81,15 @@ export function Sidebar({
           onClick={onClose}
           aria-label="Fechar menu"
         >
-          <X size={24} />
+          <X size={22} />
         </button>
       </div>
 
       <nav className="sidebar__navigation">
+        <p className="sidebar__section-label">
+          Menu
+        </p>
+
         <NavLink
           to="/"
           end
@@ -98,7 +102,7 @@ export function Sidebar({
             }`
           }
         >
-          <LayoutDashboard size={20} />
+          <LayoutDashboard size={18} />
 
           <span>Dashboard</span>
         </NavLink>
@@ -115,7 +119,7 @@ export function Sidebar({
             }`
           }
         >
-          <Smartphone size={20} />
+          <Smartphone size={18} />
 
           <span>Dispositivos</span>
         </NavLink>
@@ -132,7 +136,7 @@ export function Sidebar({
             }`
           }
         >
-          <PlusCircle size={20} />
+          <PlusCircle size={18} />
 
           <span>Novo dispositivo</span>
         </NavLink>
@@ -148,13 +152,17 @@ export function Sidebar({
             }`
           }
         >
-          <BadgeDollarSign size={20} />
+          <BadgeDollarSign size={18} />
 
           <span>Vendas</span>
         </NavLink>
 
         {isMaster && (
           <>
+            <p className="sidebar__section-label">
+              Administração
+            </p>
+
             <NavLink
               to="/relatorios"
               onClick={onClose}
@@ -169,7 +177,7 @@ export function Sidebar({
               }
             >
               <FileBarChart2
-                size={20}
+                size={18}
               />
 
               <span>Relatórios</span>
@@ -188,7 +196,7 @@ export function Sidebar({
                 }`
               }
             >
-              <Users size={20} />
+              <Users size={18} />
 
               <span>Colaboradores</span>
             </NavLink>
@@ -204,7 +212,7 @@ export function Sidebar({
             }
             disabled={isLoggingOut}
           >
-            <LogOut size={20} />
+            <LogOut size={18} />
 
             <span>
               {isLoggingOut
@@ -217,7 +225,7 @@ export function Sidebar({
 
       <footer className="sidebar__footer">
         <p>Controle de estoque</p>
-        <span>Versão 1.0.0</span>
+        <span>v1.0.0</span>
       </footer>
     </aside>
   );

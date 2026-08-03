@@ -30,10 +30,11 @@
     gap: 8px;
 
     padding: 6px;
-    border: 1px solid #e5e7eb;
-    border-radius: 12px;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
 
-    background-color: #ffffff;
+    background-color: var(--bg-surface);
+    box-shadow: var(--shadow-sm);
   }
 
   &__tab {
@@ -42,12 +43,12 @@
     justify-content: center;
     gap: 8px;
 
-    min-height: 44px;
+    min-height: 42px;
     padding: 0 18px;
     border: 0;
     border-radius: 9px;
 
-    color: #6b7280;
+    color: var(--color-slate-600);
     background-color: transparent;
 
     font: inherit;
@@ -58,20 +59,30 @@
 
     transition:
       color 0.2s,
-      background-color 0.2s;
+      background-color 0.2s,
+      box-shadow 0.2s;
 
     &:hover {
-      color: #2563eb;
-      background-color: #eff6ff;
+      color: var(--color-primary);
+      background-color: var(--color-primary-soft);
     }
 
     &--active {
       color: #ffffff;
-      background-color: #2563eb;
+      background: linear-gradient(
+        135deg,
+        #2563eb,
+        #1d4ed8
+      );
+      box-shadow: 0 4px 12px rgb(29 78 216 / 28%);
 
       &:hover {
         color: #ffffff;
-        background-color: #1d4ed8;
+        background: linear-gradient(
+          135deg,
+          #1d4ed8,
+          #1e40af
+        );
       }
     }
   }

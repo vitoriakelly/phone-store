@@ -3,15 +3,28 @@
 
   &__content {
     min-height: 100vh;
-    margin-left: 260px;
+    margin-left: var(--sidebar-width);
   }
 
   &__page {
-    padding: 32px;
+    padding: 28px 32px 40px;
+    animation: layout-page-in 0.35s ease;
   }
 
   &__overlay {
     display: none;
+  }
+}
+
+@keyframes layout-page-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
 
@@ -22,7 +35,7 @@
     }
 
     &__page {
-      padding: 24px 16px;
+      padding: 20px 16px 32px;
     }
 
     &__overlay {
@@ -33,7 +46,8 @@
       display: block;
 
       border: 0;
-      background-color: rgb(17 24 39 / 60%);
+      background-color: rgb(15 23 42 / 55%);
+      backdrop-filter: blur(2px);
     }
   }
 }
