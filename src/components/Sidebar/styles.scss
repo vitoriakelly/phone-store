@@ -37,17 +37,7 @@
     align-items: center;
     gap: 12px;
 
-    svg {
-      flex-shrink: 0;
-      padding: 8px;
-      border-radius: 10px;
-
-      color: #93c5fd;
-      background: rgb(37 99 235 / 18%);
-      box-sizing: content-box;
-    }
-
-    div {
+    > div:last-child {
       display: flex;
       flex-direction: column;
     }
@@ -58,7 +48,7 @@
       letter-spacing: -0.02em;
     }
 
-    span {
+    > div:last-child span {
       margin-top: 2px;
 
       color: #94a3b8;
@@ -66,6 +56,67 @@
       font-weight: 500;
       letter-spacing: 0.04em;
       text-transform: uppercase;
+    }
+  }
+
+  &__logo-visual {
+    position: relative;
+    flex-shrink: 0;
+
+    width: 42px;
+    height: 42px;
+  }
+
+  &__logo-device {
+    position: absolute;
+    display: block;
+
+    border: 1.5px solid rgb(255 255 255 / 28%);
+    border-radius: 8px;
+
+    background: rgb(255 255 255 / 8%);
+    box-shadow: 0 4px 12px rgb(15 23 42 / 30%);
+
+    &::before {
+      content: '';
+      position: absolute;
+      top: 3px;
+      left: 50%;
+
+      width: 8px;
+      height: 2px;
+
+      border-radius: 999px;
+      background: rgb(255 255 255 / 28%);
+      transform: translateX(-50%);
+    }
+
+    &--back {
+      top: 6px;
+      left: 2px;
+
+      width: 20px;
+      height: 32px;
+
+      transform: rotate(-14deg);
+      opacity: 0.55;
+    }
+
+    &--front {
+      top: 4px;
+      left: 14px;
+
+      width: 22px;
+      height: 34px;
+
+      border-color: rgb(147 197 253 / 55%);
+      background: linear-gradient(
+        165deg,
+        rgb(147 197 253 / 22%) 0%,
+        rgb(255 255 255 / 6%) 100%
+      );
+      transform: rotate(8deg);
+      animation: sidebar-device-float 4.5s ease-in-out infinite;
     }
   }
 
@@ -242,5 +293,16 @@
     &__close {
       display: flex;
     }
+  }
+}
+
+@keyframes sidebar-device-float {
+  0%,
+  100% {
+    transform: rotate(8deg) translateY(0);
+  }
+
+  50% {
+    transform: rotate(8deg) translateY(-3px);
   }
 }

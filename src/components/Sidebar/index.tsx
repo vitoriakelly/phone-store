@@ -67,7 +67,13 @@ export function Sidebar({
     >
       <div className="sidebar__header">
         <div className="sidebar__logo">
-          <Smartphone size={20} />
+          <div
+            className="sidebar__logo-visual"
+            aria-hidden="true"
+          >
+            <span className="sidebar__logo-device sidebar__logo-device--back" />
+            <span className="sidebar__logo-device sidebar__logo-device--front" />
+          </div>
 
           <div>
             <strong>Phone Store</strong>
