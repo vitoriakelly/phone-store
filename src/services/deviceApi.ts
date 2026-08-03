@@ -122,10 +122,7 @@ function createQueryString(
     : '';
 }
 
-/*
- * Usado pela tela principal de dispositivos.
- * Retorna somente uma página de 10 registros.
- */
+
 export async function listDevicesPage(
   filters: DeviceListFilters = {},
 ): Promise<DeviceListResponse> {
@@ -135,14 +132,47 @@ export async function listDevicesPage(
     )}`,
   );
 }
+export async function listAllDevices(
+  filters: DeviceListFilters = {},
+): Promise<Device[]> {
+  const firstPage =
+    await listDevicesPage({
+      ...filters,
+      page: 1,
+    });
 
-/*
- * Mantido para não quebrar formulários antigos
- * que chamam listDevices() esperando um array.
- *
- * Para novos selects, o ideal é criar um endpoint
- * específico de opções disponíveis.
- */
+  if (
+    firstPage.meta.totalPages <= 1
+  ) {
+    return firstPage.data;
+  }
+
+  const remainingPages =
+    await Promise.all(
+      Array.from(
+        {
+          length:
+            firstPage.meta
+              .totalPages - 1,
+        },
+        (_, index) =>
+          listDevicesPage({
+            ...filters,
+            page: index + 2,
+          }),
+      ),
+    );
+
+  return [
+    ...firstPage.data,
+
+    ...remainingPages.flatMap(
+      (response) =>
+        response.data,
+    ),
+  ];
+}
+
 export async function listDevices(): Promise<
   Device[]
 > {

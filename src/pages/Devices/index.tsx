@@ -2,6 +2,8 @@ import {
   BadgeDollarSign,
   CalendarDays,
   Eye,
+  FileDown,
+  ListChecks,
   Plus,
   RotateCcw,
   Search,
@@ -21,6 +23,7 @@ import {
 import { ApiError } from '../../services/api';
 import {
   deleteDevice,
+  listAllDevices,
   listDevicesPage,
   type DeviceListMeta,
 } from '../../services/deviceApi';
@@ -30,6 +33,9 @@ import type {
   DeviceStatus,
 } from '../../types/device';
 import { formatCurrency } from '../../utils/currency';
+import {
+  generateDevicesPdf,
+} from '../../utils/generateDevicesPdf';
 
 import './styles.scss';
 
@@ -177,6 +183,18 @@ export function Devices() {
     setDeletingDeviceId,
   ] = useState<string | null>(null);
 
+  const [
+    selectedDevices,
+    setSelectedDevices,
+  ] = useState<Map<string, Device>>(
+    () => new Map(),
+  );
+
+  const [
+    isSelectingAllAvailable,
+    setIsSelectingAllAvailable,
+  ] = useState(false);
+
   const isDateRangeInvalid =
     startDate !== '' &&
     endDate !== '' &&
@@ -188,6 +206,22 @@ export function Devices() {
     conditionFilter !== 'TODOS' ||
     startDate !== '' ||
     endDate !== '';
+
+  const availableDevicesOnPage =
+    devices.filter(
+      (device) =>
+        device.status === 'DISPONIVEL',
+    );
+
+  const areAllAvailableOnPageSelected =
+    availableDevicesOnPage.length > 0 &&
+    availableDevicesOnPage.every(
+      (device) =>
+        selectedDevices.has(device.id),
+    );
+
+  const selectedDevicesCount =
+    selectedDevices.size;
 
   useEffect(() => {
     let isMounted = true;
@@ -320,6 +354,117 @@ export function Devices() {
     setEndDate('');
   }
 
+  function handleToggleDeviceSelection(
+    device: Device,
+  ) {
+    if (device.status !== 'DISPONIVEL') {
+      return;
+    }
+
+    setSelectedDevices(
+      (currentDevices) => {
+        const nextDevices =
+          new Map(currentDevices);
+
+        if (nextDevices.has(device.id)) {
+          nextDevices.delete(device.id);
+        } else {
+          nextDevices.set(
+            device.id,
+            device,
+          );
+        }
+
+        return nextDevices;
+      },
+    );
+  }
+
+  function handleTogglePageSelection() {
+    setSelectedDevices(
+      (currentDevices) => {
+        const nextDevices =
+          new Map(currentDevices);
+
+        if (
+          areAllAvailableOnPageSelected
+        ) {
+          availableDevicesOnPage.forEach(
+            (device) => {
+              nextDevices.delete(
+                device.id,
+              );
+            },
+          );
+        } else {
+          availableDevicesOnPage.forEach(
+            (device) => {
+              nextDevices.set(
+                device.id,
+                device,
+              );
+            },
+          );
+        }
+
+        return nextDevices;
+      },
+    );
+  }
+
+  async function handleSelectAllAvailable() {
+    setIsSelectingAllAvailable(true);
+    setLoadError('');
+
+    try {
+      const availableDevices =
+        await listAllDevices({
+          status: 'DISPONIVEL',
+        });
+
+      setSelectedDevices(
+        new Map(
+          availableDevices.map(
+            (device) => [
+              device.id,
+              device,
+            ],
+          ),
+        ),
+      );
+    } catch (error) {
+      if (error instanceof ApiError) {
+        window.alert(error.message);
+      } else {
+        window.alert(
+          'Não foi possível selecionar todos os dispositivos disponíveis.',
+        );
+      }
+    } finally {
+      setIsSelectingAllAvailable(false);
+    }
+  }
+
+  function handleClearSelection() {
+    setSelectedDevices(new Map());
+  }
+
+  function handleGeneratePdf() {
+    try {
+      generateDevicesPdf(
+        Array.from(
+          selectedDevices.values(),
+        ),
+      );
+    } catch (error) {
+      window.alert(
+        error instanceof Error
+          ? error.message
+          : 'Não foi possível gerar o PDF.',
+      );
+    }
+  }
+
   async function handleDeleteDevice(
     device: Device,
   ) {
@@ -340,6 +485,17 @@ export function Devices() {
 
       setSuccessMessage(
         'Dispositivo excluído com sucesso.',
+      );
+
+      setSelectedDevices(
+        (currentDevices) => {
+          const nextDevices =
+            new Map(currentDevices);
+
+          nextDevices.delete(device.id);
+
+          return nextDevices;
+        },
       );
 
       if (
@@ -582,6 +738,63 @@ export function Devices() {
               </strong>
             </div>
 
+            <div className="devices__report-toolbar">
+              <div className="devices__selection-summary">
+                <ListChecks size={19} />
+
+                <span>
+                  {selectedDevicesCount}{' '}
+                  {selectedDevicesCount === 1
+                    ? 'dispositivo selecionado'
+                    : 'dispositivos selecionados'}
+                </span>
+              </div>
+
+              <div className="devices__report-actions">
+                <button
+                  type="button"
+                  onClick={() =>
+                    void handleSelectAllAvailable()
+                  }
+                  disabled={
+                    isLoading ||
+                    isSelectingAllAvailable
+                  }
+                >
+                  <ListChecks size={17} />
+
+                  {isSelectingAllAvailable
+                    ? 'Selecionando...'
+                    : 'Selecionar todos os disponíveis'}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleClearSelection}
+                  disabled={
+                    selectedDevicesCount === 0
+                  }
+                >
+                  <RotateCcw size={17} />
+
+                  Limpar seleção
+                </button>
+
+                <button
+                  type="button"
+                  className="devices__generate-pdf"
+                  onClick={handleGeneratePdf}
+                  disabled={
+                    selectedDevicesCount === 0
+                  }
+                >
+                  <FileDown size={18} />
+
+                  Gerar PDF
+                </button>
+              </div>
+            </div>
+
             {devices.length >
             0 ? (
               <>
@@ -589,6 +802,21 @@ export function Devices() {
                   <table className="devices__table">
                     <thead>
                       <tr>
+                        <th className="devices__selection-column">
+                          <input
+                            type="checkbox"
+                            checked={
+                              areAllAvailableOnPageSelected
+                            }
+                            onChange={handleTogglePageSelection}
+                            disabled={
+                              availableDevicesOnPage.length === 0
+                            }
+                            aria-label="Selecionar todos os dispositivos disponíveis desta página"
+                            title="Selecionar disponíveis desta página"
+                          />
+                        </th>
+
                         <th>
                           Dispositivo
                         </th>
@@ -632,6 +860,27 @@ export function Devices() {
                                 device.id
                               }
                             >
+                              <td className="devices__selection-cell">
+                                <input
+                                  type="checkbox"
+                                  checked={
+                                    selectedDevices.has(
+                                      device.id,
+                                    )
+                                  }
+                                  onChange={() =>
+                                    handleToggleDeviceSelection(
+                                      device,
+                                    )
+                                  }
+                                  disabled={
+                                    device.status !==
+                                    'DISPONIVEL'
+                                  }
+                                  aria-label={`Selecionar ${device.brand} ${device.model} para o relatório`}
+                                />
+                              </td>
+
                               <td>
                                 <div className="devices__device">
                                   <div className="devices__device-icon">
@@ -798,6 +1047,27 @@ export function Devices() {
                           key={device.id}
                           className="devices__card"
                         >
+                          {device.status ===
+                            'DISPONIVEL' && (
+                            <label className="devices__card-selection">
+                              <input
+                                type="checkbox"
+                                checked={
+                                  selectedDevices.has(
+                                    device.id,
+                                  )
+                                }
+                                onChange={() =>
+                                  handleToggleDeviceSelection(
+                                    device,
+                                  )
+                                }
+                              />
+
+                              Incluir no PDF
+                            </label>
+                          )}
+
                           <div className="devices__card-header">
                             <div className="devices__device">
                               <div className="devices__device-icon">
