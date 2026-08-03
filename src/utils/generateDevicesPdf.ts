@@ -6,6 +6,11 @@ import type {
   DeviceCondition,
 } from '../types/device';
 import { formatCurrency } from './currency';
+import {
+  DOCUMENT_BRAND,
+  formatDocumentGeneratedAt,
+  pdfColors,
+} from './documentTheme';
 
 const conditionLabels: Record<
   DeviceCondition,
@@ -22,16 +27,6 @@ function formatDate(date: string) {
   ).format(
     new Date(`${date}T12:00:00`),
   );
-}
-
-function formatGeneratedAt() {
-  return new Intl.DateTimeFormat(
-    'pt-BR',
-    {
-      dateStyle: 'short',
-      timeStyle: 'short',
-    },
-  ).format(new Date());
 }
 
 function createFileName() {
@@ -81,35 +76,85 @@ export function generateDevicesPdf(
   const pageHeight =
     document.internal.pageSize.getHeight();
 
-  document.setFont('helvetica', 'bold');
-  document.setFontSize(18);
+  const generatedAt =
+    formatDocumentGeneratedAt();
 
-  document.text(
-    'Dispositivos disponíveis',
-    14,
-    18,
-  );
+  const marginX = 14;
+  const headerBottom = 36;
 
-  document.setFont(
-    'helvetica',
-    'normal',
-  );
-  document.setFontSize(10);
+  function drawHeader() {
+    document.setFillColor(
+      ...pdfColors.primary,
+    );
+    document.rect(
+      0,
+      0,
+      pageWidth,
+      3.2,
+      'F',
+    );
 
-  document.text(
-    `Gerado em: ${formatGeneratedAt()}`,
-    14,
-    26,
-  );
+    document.setFont(
+      'helvetica',
+      'bold',
+    );
+    document.setFontSize(9);
+    document.setTextColor(
+      ...pdfColors.primary,
+    );
+    document.text(
+      DOCUMENT_BRAND.toUpperCase(),
+      marginX,
+      12,
+    );
 
-  document.text(
-    `Quantidade: ${availableDevices.length}`,
-    14,
-    32,
-  );
+    document.setFontSize(16);
+    document.setTextColor(
+      ...pdfColors.slate950,
+    );
+    document.text(
+      'Dispositivos disponíveis',
+      marginX,
+      20,
+    );
+
+    document.setFont(
+      'helvetica',
+      'normal',
+    );
+    document.setFontSize(9);
+    document.setTextColor(
+      ...pdfColors.slate600,
+    );
+    document.text(
+      `Gerado em ${generatedAt}`,
+      pageWidth - marginX,
+      12,
+      { align: 'right' },
+    );
+    document.text(
+      `${availableDevices.length} aparelho${availableDevices.length === 1 ? '' : 's'}`,
+      pageWidth - marginX,
+      18,
+      { align: 'right' },
+    );
+
+    document.setDrawColor(
+      ...pdfColors.slate200,
+    );
+    document.setLineWidth(0.3);
+    document.line(
+      marginX,
+      headerBottom - 4,
+      pageWidth - marginX,
+      headerBottom - 4,
+    );
+  }
+
+  drawHeader();
 
   autoTable(document, {
-    startY: 38,
+    startY: headerBottom,
 
     head: [
       [
@@ -145,54 +190,60 @@ export function generateDevicesPdf(
       ],
     ),
 
-    theme: 'grid',
+    theme: 'plain',
 
     styles: {
       font: 'helvetica',
       fontSize: 8,
-      cellPadding: 2.5,
+      cellPadding: { top: 3, right: 2.5, bottom: 3, left: 2.5 },
       overflow: 'linebreak',
       valign: 'middle',
+      textColor: pdfColors.slate800,
+      lineColor: pdfColors.slate200,
+      lineWidth: 0.2,
     },
 
     headStyles: {
+      fillColor: pdfColors.primary,
+      textColor: pdfColors.white,
       fontStyle: 'bold',
+      fontSize: 7.5,
       halign: 'center',
+      cellPadding: { top: 3.5, right: 2.5, bottom: 3.5, left: 2.5 },
+    },
+
+    alternateRowStyles: {
+      fillColor: pdfColors.rowAlt,
     },
 
     columnStyles: {
       0: {
         cellWidth: 42,
+        fontStyle: 'bold',
       },
-
       1: {
         cellWidth: 25,
         halign: 'center',
       },
-
       2: {
         cellWidth: 27,
       },
-
       3: {
         cellWidth: 23,
         halign: 'center',
       },
-
       4: {
         cellWidth: 20,
         halign: 'center',
       },
-
       5: {
         cellWidth: 38,
       },
-
       6: {
         cellWidth: 27,
         halign: 'right',
+        fontStyle: 'bold',
       },
-
       7: {
         cellWidth: 25,
         halign: 'center',
@@ -200,10 +251,16 @@ export function generateDevicesPdf(
     },
 
     margin: {
-      top: 38,
-      right: 14,
-      bottom: 16,
-      left: 14,
+      top: headerBottom,
+      right: marginX,
+      bottom: 18,
+      left: marginX,
+    },
+
+    didDrawPage: (data) => {
+      if (data.pageNumber > 1) {
+        drawHeader();
+      }
     },
   });
 
@@ -217,25 +274,39 @@ export function generateDevicesPdf(
   ) {
     document.setPage(pageNumber);
 
+    document.setDrawColor(
+      ...pdfColors.slate200,
+    );
+    document.setLineWidth(0.3);
+    document.line(
+      marginX,
+      pageHeight - 12,
+      pageWidth - marginX,
+      pageHeight - 12,
+    );
+
     document.setFont(
       'helvetica',
       'normal',
     );
     document.setFontSize(8);
+    document.setTextColor(
+      ...pdfColors.slate400,
+    );
+
+    document.text(
+      `${DOCUMENT_BRAND} · Relatório de estoque disponível`,
+      marginX,
+      pageHeight - 7,
+    );
 
     document.text(
       `Página ${pageNumber} de ${totalPages}`,
-      pageWidth - 14,
+      pageWidth - marginX,
       pageHeight - 7,
       {
         align: 'right',
       },
-    );
-
-    document.text(
-      'Relatório de estoque disponível',
-      14,
-      pageHeight - 7,
     );
   }
 

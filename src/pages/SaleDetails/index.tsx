@@ -886,7 +886,7 @@ export function SaleDetails() {
 
         <footer className="sale-details__receipt-footer">
           <span>
-            Registro criado em{' '}
+            Phone Store · Registro criado em{' '}
             {formatDateTime(
               sale.createdAt,
             )}

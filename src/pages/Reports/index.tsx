@@ -48,6 +48,10 @@ import type {
 } from '../../types/sale';
 import type { Seller } from '../../types/user';
 import { formatCurrency } from '../../utils/currency';
+import {
+  DOCUMENT_BRAND,
+  getPrintDocumentStyles,
+} from '../../utils/documentTheme';
 
 import './styles.scss';
 
@@ -1085,132 +1089,45 @@ export function Reports() {
       <html lang="pt-BR">
         <head>
           <meta charset="UTF-8" />
-          <title>${escapeHtml(reportTitle)}</title>
-
+          <title>${escapeHtml(reportTitle)} · ${DOCUMENT_BRAND}</title>
+          <link rel="preconnect" href="https://fonts.googleapis.com" />
+          <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+          <link
+            href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap"
+            rel="stylesheet"
+          />
           <style>
             @page {
               size: A4 landscape;
               margin: 12mm;
             }
 
-            * {
-              box-sizing: border-box;
-            }
-
-            body {
-              margin: 0;
-              color: #111827;
-              font-family: Arial, Helvetica, sans-serif;
-            }
-
-            header {
-              display: flex;
-              justify-content: space-between;
-              gap: 20px;
-              margin-bottom: 18px;
-              padding-bottom: 12px;
-              border-bottom: 2px solid #111827;
-            }
-
-            h1 {
-              margin: 0 0 5px;
-              font-size: 23px;
-            }
-
-            h2 {
-              margin: 0 0 10px;
-              font-size: 16px;
-            }
-
-            .second-title {
-              margin-top: 22px;
-            }
-
-            header p {
-              margin: 0;
-              color: #4b5563;
-              font-size: 11px;
-            }
-
-            .store {
-              text-align: right;
-            }
-
-            .summary {
-              display: grid;
-              grid-template-columns: repeat(3, 1fr);
-              gap: 8px;
-              margin-bottom: 18px;
-            }
-
-            .summary article {
-              display: flex;
-              flex-direction: column;
-              gap: 5px;
-              padding: 10px;
-              border: 1px solid #d1d5db;
-              border-radius: 6px;
-            }
-
-            .summary span {
-              color: #6b7280;
-              font-size: 10px;
-            }
-
-            .summary strong {
-              font-size: 14px;
-            }
-
-            table {
-              width: 100%;
-              border-collapse: collapse;
-            }
-
-            thead {
-              display: table-header-group;
-            }
-
-            tr {
-              break-inside: avoid;
-            }
-
-            th,
-            td {
-              padding: 6px;
-              border: 1px solid #d1d5db;
-              font-size: 8px;
-              text-align: left;
-            }
-
-            th {
-              background: #f3f4f6;
-              text-transform: uppercase;
-            }
-
-            @media print {
-              body {
-                print-color-adjust: exact;
-                -webkit-print-color-adjust: exact;
-              }
-            }
+            ${getPrintDocumentStyles()}
           </style>
         </head>
 
         <body>
-          <header>
+          <div class="doc-accent"></div>
+
+          <header class="doc-header">
             <div>
+              <span class="doc-brand">${DOCUMENT_BRAND}</span>
               <h1>${escapeHtml(reportTitle)}</h1>
-              <p>Dados obtidos conforme os filtros aplicados.</p>
+              <p class="doc-subtitle">Dados obtidos conforme os filtros aplicados.</p>
             </div>
 
-            <div class="store">
-              <strong>Phone Store</strong>
+            <div class="doc-meta">
+              <strong>Documento oficial</strong>
               <p>Emitido em ${escapeHtml(generatedAt)}</p>
             </div>
           </header>
 
           ${summaryHtml}
           ${tablesHtml}
+
+          <footer class="doc-footer">
+            ${DOCUMENT_BRAND} · Documento gerado automaticamente pelo sistema
+          </footer>
         </body>
       </html>
     `);
